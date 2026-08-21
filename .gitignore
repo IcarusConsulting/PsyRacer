@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+*.pyo
+.Python
+racer_scores.txt
+.DS_Store
+Thumbs.db
+*.log

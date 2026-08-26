@@ -4,7 +4,7 @@
 
 ![PsyRacer cover](Assets/PsyRacerSplash.jpg)
 
-A colorful terminal arcade racer. Drive a pseudo-3D highway, dodge traffic, and reach the finish line.
+A colorful terminal arcade racer. Drive a pseudo-3D highway, dodge traffic, and reach the finish line. The race view is a large playfield with a rear-view mirror on the right that shows cars and roadside objects as you pass them.
 
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![Version](https://img.shields.io/badge/version-1.0-purple)
@@ -18,16 +18,17 @@ A colorful terminal arcade racer. Drive a pseudo-3D highway, dodge traffic, and 
 - Checkered finish line with a crowd
 - Easy 10,000 m / Medium 20,000 m / Hard 30,000 m
 - High scores
-- Color-cycling menus and splash screen
+- Color-cycling menus and a splash with a looping cyberpunk skyline
+- Maximized pygame window, with optional exclusive fullscreen
 - Background music with on/off in the menu
 
 ## Requirements
 
 - [Python 3.10](https://www.python.org/downloads/) or newer
-- Windows, with a color-capable terminal such as Windows Terminal
-- No extra pip packages — the game uses the Python standard library
+- Windows
+- [pygame](https://www.pygame.org/) (`pip install pygame`)
 
-> Built and tested on **Windows**. Keyboard, RGB color, and music use the Windows console APIs.
+> Built and tested on **Windows**. The game opens a maximized pygame window. Music still uses the Windows MCI APIs.
 
 ## How to play
 
@@ -41,14 +42,15 @@ cd PsyRacer
 On Windows, start it with:
 
 ```powershell
+pip install pygame
 python racer.py
 ```
 
-If `python` is not found, try `py racer.py`. Click the terminal so it has focus. A regular terminal works better than double-clicking the file.
+If `python` is not found, try `py racer.py`.
 
 ## Controls
 
-The splash screen shows a side-view car on a looping road. Press **Enter** to reach the main menu.
+The splash screen shows a looping cyberpunk skyline. Press **Enter** to reach the main menu.
 
 On menus, move with the arrow keys and confirm with Enter. Number keys still work as shortcuts.
 
@@ -57,7 +59,8 @@ On menus, move with the arrow keys and confirm with Enter. Number keys still wor
 | Leave splash / confirm | `Enter` |
 | Move menu highlight | `Up` / `Down` |
 | Select highlighted item | `Enter` |
-| Jump to a menu item | `1`–`4` |
+| Jump to a menu item | `1`–`5` |
+| Toggle fullscreen | `F11` or menu **Display** |
 | Accelerate | `W` or `Up` |
 | Brake | `S` or `Down` |
 | Steer | `A` / `D` or `Left` / `Right` |
@@ -66,11 +69,14 @@ On menus, move with the arrow keys and confirm with Enter. Number keys still wor
 ### Game modes
 
 1. **Start Race** — pick Easy, Medium, or Hard, then take the grid.
-2. **High Scores** — best distances by difficulty.
+2. **High Scores** — top placing board with 3-letter initials.
 3. **Music: On/Off** — pause or resume the background track.
-4. **Exit**
+4. **Display: Windowed/Fullscreen** — start maximized windowed; switch to exclusive fullscreen.
+5. **Exit**
 
-Stay on the asphalt. Hitting another car slams the brakes. Lights go red-red-red-green, then you race five AI cars to a packed finish line.
+Stay on the asphalt. Hitting another car cuts both of you to half of max speed. Lights go red-red-red-green, then you race five AI cars to a packed finish line.
+
+A top-10 placing makes the board. Enter up to three initials like an old arcade: type A–Z, cycle with Up/Down, move with Left/Right, then Enter. Records rank by place, then distance.
 
 ## Project layout
 
@@ -82,7 +88,8 @@ PsyRacer/
 ├── Assets/
 │   ├── Background Music.mp3
 │   ├── PsyRacerSplash.jpg
-│   └── PsyRacerSplash.mp4
+│   ├── PsyRacerSplash.mp4
+│   └── sprites/                # cars, skyline, trees, clouds
 └── racer_scores.txt            # created locally after a race
 ```
 
@@ -90,8 +97,8 @@ You can replace `Assets/Background Music.mp3` with another MP3 of the same name.
 
 ## Troubleshooting
 
-- **Nothing happens when you press keys** — click the terminal so it is the active window.
-- **Colors look wrong** — use a modern terminal with 24-bit color (Windows Terminal is a good choice).
+- **Nothing happens when you press keys** — click the game window so it is focused.
+- **pygame not found** — run `pip install pygame` in the same Python you use to launch the game.
 - **No music** — confirm `Assets/Background Music.mp3` is in the project folder and that system volume is not muted.
 - **`python` not found** — install Python 3, enable **Add python.exe to PATH**, and reopen the terminal.
 
@@ -107,7 +114,7 @@ You can replace `Assets/Background Music.mp3` with another MP3 of the same name.
 
 - **Game** — Diamond Hand Dev (DiamondHand.Dev)
 - **Title** — PsyRacer V1.0
-- **Engine** — Python 3, standard library only
+- **Engine** — Python 3 and pygame
 - **Music** — `Assets/Background Music.mp3`
 - **Cover** — `Assets/PsyRacerSplash.jpg`
 

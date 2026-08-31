@@ -1,8 +1,16 @@
-__pycache__/
-*.py[cod]
-*.pyo
-.Python
-racer_scores.txt
+# Godot 4
+.godot/
+*.translation
+export/
+*.apk
+*.aab
+export_credentials.cfg
+
+# OS
 .DS_Store
 Thumbs.db
 *.log
+
+# Microsoft Yu Gothic is a Windows system font — do not redistribute
+assets/fonts/YuGothR.ttc
+assets/fonts/YuGothR.ttc.import

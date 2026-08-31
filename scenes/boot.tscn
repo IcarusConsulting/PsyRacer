@@ -1,0 +1,176 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/boot.gd" id="1_boot"]
+[ext_resource type="Shader" path="res://shaders/lens_rain.gdshader" id="2_rain"]
+[ext_resource type="Shader" path="res://shaders/title_shift.gdshader" id="3_title"]
+
+[sub_resource type="ShaderMaterial" id="LensRainMat"]
+shader = ExtResource("2_rain")
+shader_parameter/density = 0.4
+shader_parameter/drip_speed = 0.38
+shader_parameter/refraction = 0.014
+shader_parameter/highlight = 0.36
+shader_parameter/drip_dir = 1.0
+
+[sub_resource type="ShaderMaterial" id="TitleShiftMat"]
+shader = ExtResource("3_title")
+shader_parameter/hue_speed = 0.28
+shader_parameter/sat = 0.82
+shader_parameter/val = 1.0
+shader_parameter/sweep = 0.16
+
+[node name="Boot" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_boot")
+
+[node name="Background" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+expand_mode = 1
+stretch_mode = 0
+
+[node name="IntroVideo" type="VideoStreamPlayer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+expand = true
+volume_db = -80.0
+
+[node name="LensRain" type="ColorRect" parent="."]
+material = SubResource("LensRainMat")
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(1, 1, 1, 1)
+
+[node name="TitleBorder" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 36.0
+offset_bottom = 150.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(1, 0.4, 0.08, 1)
+theme_override_colors/font_outline_color = Color(1, 0.4, 0.08, 1)
+theme_override_constants/outline_size = 16
+theme_override_font_sizes/font_size = 96
+text = "PSY RACER"
+horizontal_alignment = 1
+
+[node name="Title" type="Label" parent="."]
+material = SubResource("TitleShiftMat")
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 36.0
+offset_bottom = 150.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_constants/outline_size = 0
+theme_override_font_sizes/font_size = 96
+text = "PSY RACER"
+horizontal_alignment = 1
+
+[node name="Byline" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 142.0
+offset_bottom = 180.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(1, 0.55, 0.18, 0.95)
+theme_override_colors/font_outline_color = Color(0.02, 0.04, 0.1, 1)
+theme_override_constants/outline_size = 6
+theme_override_font_sizes/font_size = 22
+text = "by DiamondHand.Dev"
+horizontal_alignment = 1
+
+[node name="Dim" type="ColorRect" parent="."]
+layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -220.0
+grow_horizontal = 2
+grow_vertical = 0
+color = Color(0.01, 0.02, 0.05, 0.72)
+
+[node name="Panel" type="HBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -420.0
+offset_top = -150.0
+offset_right = 420.0
+offset_bottom = -70.0
+grow_horizontal = 2
+grow_vertical = 0
+theme_override_constants/separation = 18
+alignment = 1
+
+[node name="Easy" type="Button" parent="Panel"]
+custom_minimum_size = Vector2(160, 56)
+layout_mode = 2
+text = "EASY"
+
+[node name="Medium" type="Button" parent="Panel"]
+custom_minimum_size = Vector2(160, 56)
+layout_mode = 2
+text = "MEDIUM"
+
+[node name="Hard" type="Button" parent="Panel"]
+custom_minimum_size = Vector2(160, 56)
+layout_mode = 2
+text = "HARD"
+
+[node name="Start" type="Button" parent="Panel"]
+custom_minimum_size = Vector2(200, 56)
+layout_mode = 2
+text = "START RACE"
+
+[node name="Hint" type="Label" parent="."]
+layout_mode = 1
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -280.0
+offset_top = -58.0
+offset_right = 280.0
+offset_bottom = -24.0
+theme_override_colors/font_color = Color(0.55, 0.9, 1, 0.85)
+theme_override_font_sizes/font_size = 18
+text = "ENTER to race    WASD to drive    M music"
+horizontal_alignment = 1
+
+[node name="Flash" type="ColorRect" parent="."]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(1, 1, 1, 0)

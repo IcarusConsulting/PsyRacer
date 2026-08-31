@@ -1,125 +1,73 @@
-# PsyRacer V1.0
+# PsyRacer v0.10
 
-**by Diamond Hand Dev** (DiamondHand.Dev)
+**by DiamondHand.Dev**
 
-![PsyRacer cover](Assets/PsyRacerSplash.jpg)
+![PsyRacer cover](assets/PsyRacerSplash.jpg)
 
-A colorful terminal arcade racer. Drive a pseudo-3D highway, dodge traffic, and reach the finish line. The race view is a large playfield with a rear-view mirror on the right that shows cars and roadside objects as you pass them.
-
-![Python](https://img.shields.io/badge/python-3.10%2B-blue)
-![Version](https://img.shields.io/badge/version-1.0-purple)
+![Godot](https://img.shields.io/badge/godot-4.7.2-blue)
+![Version](https://img.shields.io/badge/version-0.10-purple)
+![Status](https://img.shields.io/badge/status-alpha-orange)
 ![Platform](https://img.shields.io/badge/platform-Windows-blue)
 
-## Features
-
-- Pseudo-3D highway with curves, trees, and buildings
-- Five AI Indy cars on the grid with you
-- Starting lights: red, red, red, then green (3, 2, 1, GO!)
-- Checkered finish line with a crowd
-- Easy 10,000 m / Medium 20,000 m / Hard 30,000 m
-- High scores
-- Color-cycling menus and a splash with a looping cyberpunk skyline
-- Maximized pygame window, with optional exclusive fullscreen
-- Background music with on/off in the menu
+1080p night-highway racer. Neon wet asphalt, a black hypercar, overhead Japanese-style gantries, and a cyberpunk skyline that grows toward the finish. Alpha rebuild of the pygame V1.0 slice in **Godot 4**.
 
 ## Requirements
 
-- [Python 3.10](https://www.python.org/downloads/) or newer
+- [Godot 4.7.2](https://godotengine.org/download/archive/4.7.2-stable/) (Forward+)
 - Windows
-- [pygame](https://www.pygame.org/) (`pip install pygame`)
 
-> Built and tested on **Windows**. The game opens a maximized pygame window. Music still uses the Windows MCI APIs.
+Open this folder in Godot and press Play. Main scene is `scenes/boot.tscn`.
 
 ## How to play
 
-Clone the repo and keep the `Assets` folder next to `racer.py`.
-
-```bash
-git clone https://github.com/IcarusConsulting/PsyRacer.git
-cd PsyRacer
-```
-
-On Windows, start it with:
-
-```powershell
-pip install pygame
-python racer.py
-```
-
-If `python` is not found, try `py racer.py`.
-
-## Controls
-
-The splash screen shows a looping cyberpunk skyline. Press **Enter** to reach the main menu.
-
-On menus, move with the arrow keys and confirm with Enter. Number keys still work as shortcuts.
-
 | Action | Key |
 | --- | --- |
-| Leave splash / confirm | `Enter` |
-| Move menu highlight | `Up` / `Down` |
-| Select highlighted item | `Enter` |
-| Jump to a menu item | `1`–`5` |
-| Toggle fullscreen | `F11` or menu **Display** |
+| Start race | `Enter` |
 | Accelerate | `W` or `Up` |
 | Brake | `S` or `Down` |
 | Steer | `A` / `D` or `Left` / `Right` |
-| Return to menu | `Esc` or `Q` |
+| Mute music | `M` |
+| Back to title | `Esc` |
 
-### Game modes
+Five AI cars share the grid with you. Lights go red-red-red-green, then you race to the finish. Hitting another car cuts both of you to half of max speed.
 
-1. **Start Race** — pick Easy, Medium, or Hard, then take the grid.
-2. **High Scores** — top placing board with 3-letter initials.
-3. **Music: On/Off** — pause or resume the background track.
-4. **Display: Windowed/Fullscreen** — start maximized windowed; switch to exclusive fullscreen.
-5. **Exit**
+On the splash, press Enter to play the visor intro (muted), then a white flash drops you onto the grid. Title and UI stay up until that flash.
 
-Stay on the asphalt. Hitting another car cuts both of you to half of max speed. Lights go red-red-red-green, then you race five AI cars to a packed finish line.
+## Look
 
-A top-10 placing makes the board. Enter up to three initials like an old arcade: type A–Z, cycle with Up/Down, move with Left/Right, then Enter. Records rank by place, then distance.
+Cover art `assets/PsyRacerSplash.jpg` is the style bible: wet asphalt, cyan/orange neon, black hypercar, night city.
+
+- Horizon city eases closer as you near the finish
+- Color-cycling matrix rain wraps the sky and dies at the horizon
+- Streetlamp LED bulbs, no light cones
+- NEXCO-style overhead signs every 2000 m
+- Cars currently use a rear-view sprite sheet (placeholder until Blender models)
+
+Highway kanji uses **Yu Gothic** when the font file is present locally, otherwise the matching Windows system font.
 
 ## Project layout
 
 ```text
 PsyRacer/
-├── racer.py
+├── project.godot
 ├── README.md
-├── .gitignore
-├── Assets/
-│   ├── Background Music.mp3
-│   ├── PsyRacerSplash.jpg
-│   ├── PsyRacerSplash.mp4
-│   └── sprites/                # cars, skyline, trees, clouds
-└── racer_scores.txt            # created locally after a race
+├── assets/          # splash, music, sprites, intro video
+├── scenes/          # boot title, race
+├── scripts/
+├── shaders/
+└── samples/         # Imagine reference clips
 ```
 
-You can replace `Assets/Background Music.mp3` with another MP3 of the same name.
-
-## Troubleshooting
-
-- **Nothing happens when you press keys** — click the game window so it is focused.
-- **pygame not found** — run `pip install pygame` in the same Python you use to launch the game.
-- **No music** — confirm `Assets/Background Music.mp3` is in the project folder and that system volume is not muted.
-- **`python` not found** — install Python 3, enable **Add python.exe to PATH**, and reopen the terminal.
-
-## GitHub social preview
-
-`Assets/PsyRacerSplash.jpg` is the game cover. Set it as the social preview so Discord, X, Slack, and GitHub show this art when the link is shared:
-
-1. Open the repo on GitHub
-2. **Settings → General → Social preview**
-3. Upload `Assets/PsyRacerSplash.jpg`
+Replace `assets/Background Music.mp3` with another MP3 of the same name if you want a different track.
 
 ## Credits
 
-- **Game** — Diamond Hand Dev (DiamondHand.Dev)
-- **Title** — PsyRacer V1.0
-- **Engine** — Python 3 and pygame
-- **Music** — `Assets/Background Music.mp3`
-- **Cover** — `Assets/PsyRacerSplash.jpg`
-
-Made with a grid, a finish line, and too many colors.
+- **Game** — DiamondHand.Dev
+- **Title** — PsyRacer v0.10 (alpha)
+- **Engine** — Godot 4.7.2
+- **Music** — `assets/Background Music.mp3`
+- **Cover** — `assets/PsyRacerSplash.jpg`
 
 ---
 
-© Diamond Hand Dev. All rights reserved.
+© DiamondHand.Dev. All rights reserved.

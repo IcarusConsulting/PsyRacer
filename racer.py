@@ -576,7 +576,14 @@ SPRITE_FILES = {
     "tree_tall": "tree_tall.png",
     "cloud": "cloud.png",
     "cloud_small": "cloud_small.png",
+    "road": "road.png",
 }
+# car_side.png faces right (Race car Splash). Overlay wheels map through
+# the same scale as the car, no horizontal flip. Near-side rear then front.
+SIDE_WHEEL_SRC = (
+    (348, 288, 98),
+    (1168, 300, 100),
+)
 SPRITE_CELL_WIDTH = {
     "side": 22.0,
     "tree": 10.5,
@@ -586,14 +593,32 @@ SPRITE_CELL_WIDTH = {
 }
 SCENERY_SPRITES = {
     "skyline.png",
-    "tree.png",
-    "tree_tall.png",
     "cloud.png",
     "cloud_small.png",
 }
+CROWD_KINDS = []
+CROWD_TALL = set()
+CROWD_FLASHERS = set()
+CROWD_SHORT = set()
+for _crowd_i in range(1, 31):
+    _kind = f"person_{_crowd_i:02d}"
+    SPRITE_FILES[_kind] = f"{_kind}.png"
+    SPRITE_CELL_WIDTH[_kind] = 10.5
+    CROWD_KINDS.append(_kind)
+CROWD_TALL.update(
+    f"person_{n:02d}" for n in (4, 5, 7, 16, 20, 22, 26)
+)
+CROWD_FLASHERS.update(
+    f"person_{n:02d}" for n in (3, 5, 8, 15, 18, 24, 29)
+)
+CROWD_SHORT.add("person_02")
 SCENE_BANDS = []
 SCENE_EDGES = []
-RAIN_GLYPHS = "01#$%<>*+=|/\\7TZ"
+RAIN_GLYPHS = (
+    "ｱｲｳｴｵｶｷｸｹｺｻｼｽｾｿﾀﾁﾂﾃﾄﾅﾆﾇﾈﾉﾊﾋﾌﾍﾎﾏﾐﾑﾒﾓﾔﾕﾖﾗﾘﾙﾚﾛﾜﾝ"
+    "012345789:.=*+<>|"
+)
+RAIN_CELLS = []
 
 
 def _visible_width(text):
@@ -635,6 +660,7 @@ class GameVideo:
         self._grid_rows = 24
         self._needs_refit = False
         self._held_pg = set()
+        self.matrix_font = None
 
     def start(self):
         import pygame
@@ -796,7 +822,12 @@ class GameVideo:
             if not os.path.isfile(path):
                 continue
             image = pygame.image.load(path).convert_alpha()
-            if image.get_width() > 2 and image.get_height() > 2 and image.get_at((2, 2))[3] > 0:
+            if (
+                name != "road.png"
+                and image.get_width() > 2
+                and image.get_height() > 2
+                and image.get_at((2, 2))[3] > 0
+            ):
                 bg = image.get_at((2, 2))
                 width, height = image.get_size()
                 threshold = 72
@@ -809,7 +840,7 @@ class GameVideo:
                             and abs(pixel[2] - bg[2]) < threshold
                         ):
                             image.set_at((x, y), (0, 0, 0, 0))
-            if name in SCENERY_SPRITES and name != "skyline.png":
+            if name in SCENERY_SPRITES and name not in ("skyline.png", "road.png"):
                 image = self._trim_sprite(image)
             self.sprites[name] = image
         self._sprite_cache = {}
@@ -829,7 +860,7 @@ class GameVideo:
         if hue is not None:
             sprite = self.tint_sprite(sprite, hue)
         self._sprite_cache[key] = sprite
-        if len(self._sprite_cache) > 64:
+        if len(self._sprite_cache) > 160:
             self._sprite_cache.pop(next(iter(self._sprite_cache)))
         return sprite
 
@@ -879,6 +910,19 @@ class GameVideo:
         self.cell = cell
         self._grid_cols = cols
         self._grid_rows = rows
+        px = max(10, cell[1])
+        self.matrix_font = None
+        for path in (
+            r"C:\Windows\Fonts\msgothic.ttc",
+            r"C:\Windows\Fonts\YuGothR.ttc",
+        ):
+            try:
+                self.matrix_font = pygame.font.Font(path, px)
+                break
+            except Exception:
+                continue
+        if self.matrix_font is None:
+            self.matrix_font = pygame.font.SysFont("ms gothic", px)
 
     def _apply_from_surface(self):
         apply_layout(self._grid_cols, self._grid_rows, tight=True)
@@ -1009,6 +1053,7 @@ class GameVideo:
         origin_y = max(0, (screen_h - content_h) // 2)
         self.origin = (origin_x, origin_y)
         self._blit_scene_bands(origin_x, origin_y, cell_w, cell_h, content_cols)
+        self._blit_road_layers(origin_x, origin_y, cell_w, cell_h)
         x = y = 0
         run = []
         run_color = (220, 220, 220)
@@ -1055,11 +1100,13 @@ class GameVideo:
             run.append(char)
             x += 1
         flush()
+        self._blit_matrix_rain(origin_x, origin_y, cell_w, cell_h)
         self._blit_sprites(origin_x, origin_y, cell_w, cell_h)
         self._blit_scene_edges(origin_x, origin_y, cell_w, cell_h, content_cols)
         SPRITE_OVERLAYS.clear()
         SCENE_BANDS.clear()
         SCENE_EDGES.clear()
+        RAIN_CELLS.clear()
         pygame.display.flip()
 
     def _blit_scene_bands(self, origin_x, origin_y, cell_w, cell_h, cols):
@@ -1083,30 +1130,96 @@ class GameVideo:
                 y -= thickness
             pygame.draw.rect(self.screen, color, (origin_x, y, width, thickness))
 
-    def _make_wheel(self, radius, angle):
+    def _blit_matrix_rain(self, origin_x, origin_y, cell_w, cell_h):
+        if not RAIN_CELLS or self.matrix_font is None:
+            return
         pygame = self._pygame
-        key = ("wheel", int(radius), int(angle * 6) % 36)
+        for gx, gy, glyph, rgb in RAIN_CELLS:
+            color = (rgb[0] & ~7, rgb[1] & ~7, rgb[2] & ~7)
+            key = ("rain", glyph, color)
+            surf = self._sprite_cache.get(key)
+            if surf is None:
+                surf = self.matrix_font.render(glyph, True, color)
+                self._sprite_cache[key] = surf
+            self.screen.blit(
+                surf,
+                (origin_x + gx * cell_w, origin_y + gy * cell_h),
+            )
+
+    def _blit_road_layers(self, origin_x, origin_y, cell_w, cell_h):
+        for kind, cx, cy, scale, hue, grid_w, tint in SPRITE_OVERLAYS:
+            if kind == "road":
+                self._blit_road_strip(origin_x, origin_y, cell_w, cell_h, cx, cy, scale, grid_w)
+
+    def _blit_road_strip(self, origin_x, origin_y, cell_w, cell_h, cx, cy, scale, grid_w):
+        pygame = self._pygame
+        name = SPRITE_FILES.get("road")
+        image = self.sprites.get(name) if name else None
+        if image is None:
+            return
+        rows = max(int(scale), int(cy) + 2)
+        dest_h = max(8, int((rows - cy) * cell_h))
+        dest_w = max(32, int(dest_h * image.get_width() / max(1, image.get_height())))
+        sprite = self._scaled_sprite(name, dest_w, dest_h)
+        if sprite is None:
+            return
+        content_w = int(grid_w * cell_w)
+        top = origin_y + int(cy * cell_h)
+        offset = int(cx * cell_w) % dest_w
+        x = origin_x - offset
+        while x < origin_x + content_w:
+            self.screen.blit(sprite, (x, top))
+            x += dest_w
+
+    def _make_wheel(self, radius, angle, style="race"):
+        pygame = self._pygame
+        quant = 8 if style == "neon" else 6
+        key = ("wheel", style, int(radius), int(angle * quant) % (quant * 8))
         cached = self._sprite_cache.get(key)
         if cached is not None:
             return cached
-        size = max(8, int(radius * 2) + 2)
+        size = max(8, int(radius * 2) + 4)
         surf = pygame.Surface((size, size), pygame.SRCALPHA)
         cx = cy = size // 2
-        pygame.draw.circle(surf, (18, 18, 20), (cx, cy), radius)
-        pygame.draw.circle(surf, (48, 48, 52), (cx, cy), max(3, int(radius * 0.88)))
-        pygame.draw.circle(surf, (28, 28, 30), (cx, cy), max(2, int(radius * 0.55)))
-        spoke_color = (210, 210, 220)
-        for index in range(6):
-            theta = angle + index * (math.pi / 3)
-            inner = max(2, int(radius * 0.18))
-            outer = int(radius * 0.82)
-            x1 = cx + math.cos(theta) * inner
-            y1 = cy + math.sin(theta) * inner
-            x2 = cx + math.cos(theta) * outer
-            y2 = cy + math.sin(theta) * outer
-            pygame.draw.line(surf, spoke_color, (x1, y1), (x2, y2), max(1, radius // 7))
-        pygame.draw.circle(surf, (190, 190, 196), (cx, cy), max(2, int(radius * 0.22)))
-        pygame.draw.circle(surf, (90, 90, 96), (cx, cy), max(1, int(radius * 0.10)))
+        if style == "neon":
+            pygame.draw.circle(surf, (12, 12, 14), (cx, cy), radius)
+            pygame.draw.circle(surf, (28, 28, 32), (cx, cy), max(3, int(radius * 0.90)))
+            rim_outer = max(4, int(radius * 0.78))
+            rim_inner = max(3, int(radius * 0.64))
+            pygame.draw.circle(surf, (255, 110, 28), (cx, cy), rim_outer)
+            pygame.draw.circle(surf, (40, 40, 48), (cx, cy), rim_inner)
+            pygame.draw.circle(surf, (22, 22, 26), (cx, cy), max(2, int(radius * 0.50)))
+            spoke_color = (255, 150, 50)
+            spokes = 5
+            thick = max(2, radius // 6)
+            for index in range(spokes):
+                theta = angle + index * (2 * math.pi / spokes)
+                inner = max(2, int(radius * 0.12))
+                outer = int(radius * 0.62)
+                x1 = cx + math.cos(theta) * inner
+                y1 = cy + math.sin(theta) * inner
+                x2 = cx + math.cos(theta) * outer
+                y2 = cy + math.sin(theta) * outer
+                pygame.draw.line(surf, spoke_color, (x1, y1), (x2, y2), thick)
+            pygame.draw.circle(surf, (255, 140, 40), (cx, cy), max(3, int(radius * 0.20)))
+            pygame.draw.circle(surf, (50, 50, 56), (cx, cy), max(1, int(radius * 0.08)))
+            pygame.draw.circle(surf, (255, 120, 35), (cx, cy), radius, max(1, radius // 14))
+        else:
+            pygame.draw.circle(surf, (18, 18, 20), (cx, cy), radius)
+            pygame.draw.circle(surf, (48, 48, 52), (cx, cy), max(3, int(radius * 0.88)))
+            pygame.draw.circle(surf, (28, 28, 30), (cx, cy), max(2, int(radius * 0.55)))
+            spoke_color = (210, 210, 220)
+            for index in range(6):
+                theta = angle + index * (math.pi / 3)
+                inner = max(2, int(radius * 0.18))
+                outer = int(radius * 0.82)
+                x1 = cx + math.cos(theta) * inner
+                y1 = cy + math.sin(theta) * inner
+                x2 = cx + math.cos(theta) * outer
+                y2 = cy + math.sin(theta) * outer
+                pygame.draw.line(surf, spoke_color, (x1, y1), (x2, y2), max(1, radius // 7))
+            pygame.draw.circle(surf, (190, 190, 196), (cx, cy), max(2, int(radius * 0.22)))
+            pygame.draw.circle(surf, (90, 90, 96), (cx, cy), max(1, int(radius * 0.10)))
         self._sprite_cache[key] = surf
         return surf
 
@@ -1114,13 +1227,20 @@ class GameVideo:
         if dest_rect.width < 18 or dest_rect.height < 12:
             return
         wheels = []
+        style = "race"
         if kind == "side":
-            radius = max(4, int(dest_rect.height * 0.12))
-            cy = dest_rect.y + int(dest_rect.height * 0.70)
-            wheels = [
-                (dest_rect.x + int(dest_rect.width * 0.22), cy, radius),
-                (dest_rect.x + int(dest_rect.width * 0.78), cy, radius),
-            ]
+            style = "neon"
+            src = self.sprites.get(SPRITE_FILES["side"])
+            if src is None:
+                return
+            sw, sh = src.get_size()
+            for sx, sy, sr in SIDE_WHEEL_SRC:
+                fx = sx / float(sw)
+                fy = sy / float(sh)
+                cx = dest_rect.x + fx * dest_rect.width
+                cy = dest_rect.y + fy * dest_rect.height
+                radius = max(5, int(round(sr * dest_rect.width / float(sw))))
+                wheels.append((cx, cy, radius))
         else:
             rear_r = max(3, int(dest_rect.width * 0.12))
             front_r = max(2, int(dest_rect.width * 0.07))
@@ -1131,16 +1251,40 @@ class GameVideo:
                 (dest_rect.x + int(dest_rect.width * 0.73), dest_rect.y + int(dest_rect.height * 0.36), front_r),
             ]
         for cx, cy, radius in wheels:
-            wheel = self._make_wheel(radius, angle)
-            ghost = self._make_wheel(radius, angle - 0.5)
-            ghost.set_alpha(80)
+            wheel = self._make_wheel(radius, angle, style)
+            ghost = self._make_wheel(radius, angle - 0.45, style)
+            ghost.set_alpha(90)
             self.screen.blit(ghost, ghost.get_rect(center=(cx, cy)))
             self.screen.blit(wheel, wheel.get_rect(center=(cx, cy)))
 
+    def _blit_camera_flash(self, origin_x, origin_y, cell_w, cell_h, cx, cy, intensity):
+        pygame = self._pygame
+        intensity = max(0.0, min(1.0, float(intensity)))
+        if intensity <= 0.02:
+            return
+        px = origin_x + int(cx * cell_w)
+        py = origin_y + int(cy * cell_h)
+        radius = max(3, int(cell_w * (0.22 + 0.38 * intensity)))
+        size = radius * 6
+        surf = pygame.Surface((size, size), pygame.SRCALPHA)
+        center = (size // 2, size // 2)
+        pygame.draw.circle(surf, (255, 220, 140, int(70 * intensity)), center, radius * 2)
+        pygame.draw.circle(surf, (255, 255, 220, int(160 * intensity)), center, radius)
+        pygame.draw.circle(surf, (255, 255, 255, int(230 * intensity)), center, max(2, radius // 3))
+        arm = int(radius * 1.6)
+        thick = max(1, radius // 5)
+        pygame.draw.line(surf, (255, 255, 255, int(180 * intensity)), (center[0] - arm, center[1]), (center[0] + arm, center[1]), thick)
+        pygame.draw.line(surf, (255, 255, 255, int(180 * intensity)), (center[0], center[1] - arm), (center[0], center[1] + arm), thick)
+        self.screen.blit(surf, surf.get_rect(center=(px, py)), special_flags=pygame.BLEND_ADD)
+
     def _blit_sprites(self, origin_x, origin_y, cell_w, cell_h):
         pygame = self._pygame
-        spin = time.time() * 16.0
         for kind, cx, cy, scale, hue, grid_w, tint in SPRITE_OVERLAYS:
+            if kind == "flash":
+                self._blit_camera_flash(origin_x, origin_y, cell_w, cell_h, cx, cy, scale)
+                continue
+            if kind == "road":
+                continue
             name = SPRITE_FILES.get(kind)
             image = self.sprites.get(name) if name else None
             if image is None:
@@ -1163,7 +1307,7 @@ class GameVideo:
                 self.screen.set_clip(prev_clip)
                 continue
             if kind == "side":
-                dest_w = max(48, int(cell_w * SPRITE_CELL_WIDTH["side"]))
+                dest_w = max(48, int(cell_w * SPRITE_CELL_WIDTH["side"] * max(0.4, scale)))
             elif kind == "rear":
                 dest_w = max(12, int(cell_w * (3.2 + scale * 5.5) * 0.9))
             else:
@@ -1174,8 +1318,17 @@ class GameVideo:
                 if dest_h > max_h:
                     dest_w = max(12, int(dest_w * max_h / dest_h))
                     dest_h = max_h
+            elif kind.startswith("person"):
+                max_h = max(24, int(cell_h * 18))
+                if kind in CROWD_TALL:
+                    dest_h = max(6, int(max_h * 0.10))
+                elif kind in CROWD_SHORT:
+                    dest_h = max(6, int(max_h * 0.07))
+                else:
+                    dest_h = max(6, int(max_h * 0.086))
+                dest_w = max(4, int(dest_h * image.get_width() / max(1, image.get_height())))
             sprite = self._scaled_sprite(
-                name, dest_w, dest_h, flip=(kind == "side"), hue=(hue if tint else None)
+                name, dest_w, dest_h, flip=False, hue=(hue if tint else None)
             )
             if sprite is None:
                 continue
@@ -1190,8 +1343,8 @@ class GameVideo:
                 foot = py + cell_h if kind in ("side", "rear") else py
             rect = sprite.get_rect(midbottom=(px, foot))
             self.screen.blit(sprite, rect)
-            if kind in ("side", "rear"):
-                self._blit_wheel_spin(rect, kind, spin)
+            if kind == "side":
+                self._blit_wheel_spin(rect, kind, time.time() * 22.0)
 
     def stop(self):
         if self.active and self._pygame is not None:
@@ -2507,12 +2660,16 @@ def f1_side_car(wheel_frame):
 def _splash_sprites_ready():
     if not VIDEO.active:
         return False
-    return all(VIDEO.sprites.get(name) for name in SCENERY_SPRITES)
+    if not all(VIDEO.sprites.get(name) for name in SCENERY_SPRITES):
+        return False
+    return any(VIDEO.sprites.get(SPRITE_FILES.get(kind)) for kind in CROWD_KINDS)
 
 
 def _draw_matrix_rain(grid, colors, tick, hue, cols, road_top):
+    RAIN_CELLS.clear()
     glyphs = RAIN_GLYPHS
     glyph_count = len(glyphs)
+    video = VIDEO.active
     for x in range(cols):
         seed = (x * 1103515245 + 12345) & 0x7FFFFFFF
         if seed % 5 == 0:
@@ -2535,11 +2692,15 @@ def _draw_matrix_rain(grid, colors, tick, hue, cols, road_top):
                 rain_hue = (hue + tick * 90 + x * 6 - i * 10) % 360
                 value = 1.0 if i == 0 else 0.22 + 0.78 * fade
                 sat = 0.35 if i == 0 else 0.9
-                grid[y][x] = glyph
-                colors[y][x] = (rain_hue, value, sat)
+                if video:
+                    if y >= 3:
+                        RAIN_CELLS.append((x, y, glyph, hsv_rgb(rain_hue, sat, value)))
+                else:
+                    grid[y][x] = glyph
+                    colors[y][x] = (rain_hue, value, sat)
 
 
-def _queue_splash_scenery(tick, cols, road_top):
+def _queue_splash_scenery(tick, cols, rows, road_top):
     rng = random.Random(3)
     span = cols + 50
     sky = max(8, road_top)
@@ -2551,17 +2712,35 @@ def _queue_splash_scenery(tick, cols, road_top):
         scale = 0.78 + (index % 3) * 0.16
         SPRITE_OVERLAYS.append((kind, x, y, scale, 0, cols, False))
 
-    SPRITE_OVERLAYS.append(("skyline", tick * 8, road_top, 1.0, 0, cols, False))
+    city_scroll = tick * 8.0
+    SPRITE_OVERLAYS.append(("skyline", city_scroll, road_top, 1.0, 0, cols, False))
+    if VIDEO.sprites.get(SPRITE_FILES.get("road")):
+        SPRITE_OVERLAYS.append(("road", tick * 54.0, road_top, float(rows), 0, cols, False))
 
-    start = -14 + (-(tick * 18 + 9) % 17)
-    index = 0
-    x = start
-    while x < cols + 14:
-        kind = "tree_tall" if index % 3 == 0 else "tree"
-        scale = 1.05 if kind == "tree_tall" else 0.92
-        SPRITE_OVERLAYS.append((kind, x + 4, road_top, scale, 0, cols, False))
-        x += 17
-        index += 1
+    kinds = [kind for kind in CROWD_KINDS if VIDEO.sprites.get(SPRITE_FILES.get(kind))]
+    if kinds:
+        spacing = 1.45
+        start = -spacing
+        x = start - 2
+        index = 0
+        while x < cols + 4:
+            kind = kinds[index % len(kinds)]
+            SPRITE_OVERLAYS.append((kind, x, road_top, 1.0, 0, cols, False))
+            if kind in CROWD_FLASHERS:
+                period = 1.6 + (index % 11) * 0.37
+                phase = (tick * 3.1 + index * 1.17) % period
+                if phase < 0.08:
+                    burst = 1.0 - phase / 0.08
+                    flash_y = road_top - (1.65 if kind in CROWD_TALL else 1.35)
+                    SPRITE_OVERLAYS.append(("flash", x + 0.25, flash_y, burst, 0, cols, False))
+            x += spacing
+            index += 1
+
+    if VIDEO.sprites.get(SPRITE_FILES.get("side")):
+        road_y = road_top + max(3, int((rows - road_top) * 0.62))
+        bob = math.sin(tick * 11.0) * 0.12
+        drive_x = cols * 0.34 + math.sin(tick * 1.5) * 2.2
+        SPRITE_OVERLAYS.append(("side", drive_x, road_y + bob, 2.15, 0, cols, False))
 
 
 def render_title_cruise(tick, hue):
@@ -2577,12 +2756,14 @@ def render_title_cruise(tick, hue):
     road_top = max(12, (rows * 2) // 3)
     use_sprites = _splash_sprites_ready()
 
+    use_road = bool(VIDEO.sprites.get(SPRITE_FILES.get("road")))
     if use_sprites:
         SCENE_BANDS.append((0, road_top, (0, 0, 0)))
-        SCENE_BANDS.append((road_top, rows, (40, 40, 44)))
-        SCENE_EDGES.append(("top", road_top, (255, 255, 255), 3))
-        SCENE_EDGES.append(("bottom", rows, (255, 255, 255), 3))
-        _queue_splash_scenery(tick, cols, road_top)
+        if not use_road:
+            SCENE_BANDS.append((road_top, rows, (40, 40, 44)))
+            SCENE_EDGES.append(("top", road_top, (255, 255, 255), 3))
+            SCENE_EDGES.append(("bottom", rows, (255, 255, 255), 3))
+        _queue_splash_scenery(tick, cols, rows, road_top)
     else:
         for y in range(road_top, rows):
             for x in range(cols):
@@ -2603,26 +2784,27 @@ def render_title_cruise(tick, hue):
             splash_blit_at(grid, colors, x, road_top - len(art), art, 15 + (index * 10) % 25, 0.35)
             x += 28
             index += 1
-        tree = ["  ###  ", " ##### ", "   |   "]
-        tall = ["   #   ", "  ###  ", " ##### ", "   |   ", "   |   "]
-        start = -12 + int(-(tick * 18 + 9) % 18)
+        person = [" o ", "/|\\", " | "]
+        tall = [" o ", "/|\\", " | ", "/ \\"]
+        start = -12 + int(-(tick * 18 + 9) % 7)
         index = 0
         x = start
         while x < cols + 12:
-            art = tall if index % 3 == 0 else tree
-            splash_blit_at(grid, colors, x, road_top - len(art), art, 120, 0.55)
-            x += 18
+            art = tall if index % 3 == 0 else person
+            splash_blit_at(grid, colors, x, road_top - len(art), art, 30 + (index * 18) % 50, 0.85)
+            x += 7
             index += 1
 
     _draw_matrix_rain(grid, colors, tick, hue, cols, road_top)
 
-    dash_shift = int(tick * 34) % 10
-    dash_y = min(rows - 2, road_top + max(2, (rows - road_top) // 2))
-    for x in range(cols):
-        if (x + dash_shift) % 10 < 5:
-            if 0 <= dash_y < rows:
-                grid[dash_y][x] = "▀"
-                colors[dash_y][x] = (52, 1.0, 1.0)
+    if not (VIDEO.active and VIDEO.sprites.get(SPRITE_FILES.get("road"))):
+        dash_shift = int(tick * 34) % 10
+        dash_y = min(rows - 2, road_top + max(2, (rows - road_top) // 2))
+        for x in range(cols):
+            if (x + dash_shift) % 10 < 5:
+                if 0 <= dash_y < rows:
+                    grid[dash_y][x] = "▀"
+                    colors[dash_y][x] = (52, 1.0, 1.0)
 
     lines = []
     for y in range(rows):

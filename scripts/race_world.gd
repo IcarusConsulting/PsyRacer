@@ -34,6 +34,8 @@ var _scenery: Node3D
 var _last_mesh_z: float = -999.0
 var _finish_hold := 0.0
 var _lamp_root: Node3D
+var _prev_player_x := 0.0
+var _prev_ai_x: Array[float] = []
 
 
 func _ready() -> void:
@@ -106,6 +108,7 @@ func _build_world() -> void:
 		car.cyan = ai_look[i][2]
 		add_child(car)
 		_ai_nodes.append(car)
+		_prev_ai_x.append(sim.cars[i].x)
 
 	_skyline = MeshInstance3D.new()
 	_skyline.name = "HorizonCity"
@@ -210,7 +213,7 @@ func _process(delta: float) -> void:
 		brake = 1.0
 
 	sim.tick(delta, steer, throttle, brake)
-	_sync_transforms()
+	_sync_transforms(delta)
 	_rebuild_road(false)
 	_update_scenery()
 	_update_horizon()
@@ -222,18 +225,24 @@ func _process(delta: float) -> void:
 			get_tree().change_scene_to_file("res://scenes/boot.tscn")
 
 
-func _sync_transforms() -> void:
+func _sync_transforms(delta: float) -> void:
 	var ppos := sim.world_pos(sim.distance, sim.player_x)
 	ppos.y = 0.0
 	_player.global_position = ppos
 	var heading := -RaceSim.road_curve(sim.distance + 6.0) * 0.45
-	_player.rotation = Vector3(0.0, heading, 0.0)
+	var dt := maxf(delta, 0.0001)
+	var player_slide := clampf((sim.player_x - _prev_player_x) / dt * 1.6, -1.0, 1.0)
+	_prev_player_x = sim.player_x
+	_player.pose(heading, player_slide, delta)
 
 	for i in _ai_nodes.size():
 		var r: RaceSim.Racer = sim.cars[i]
 		var apos := sim.world_pos(r.z, r.x)
 		_ai_nodes[i].global_position = apos
-		_ai_nodes[i].rotation.y = -RaceSim.road_curve(r.z + 6.0) * 0.45
+		var ai_heading := -RaceSim.road_curve(r.z + 6.0) * 0.45
+		var ai_slide := clampf((r.x - _prev_ai_x[i]) / dt * 1.6, -1.0, 1.0)
+		_prev_ai_x[i] = r.x
+		_ai_nodes[i].pose(ai_heading, ai_slide, delta)
 		_ai_nodes[i].visible = (r.z - sim.distance) > -8.0 and (r.z - sim.distance) < LOOK_AHEAD
 
 	var cam_back := Vector3(sin(heading) * 8.2, 2.15, -cos(heading) * 8.2)

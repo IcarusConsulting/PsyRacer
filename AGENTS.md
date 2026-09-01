@@ -23,6 +23,7 @@ Git/Godot/push mechanics for this PC: user skill **godot-github** (`~/.grok/skil
 - Lamps sit just outside the roadway, blue-white both sides.
 - Overhead NEXCO-style gantries every 2000 m (Yu Gothic / system CJK).
 - Easy 10 km / Medium 20 km / Hard 30 km; 5 AI; collision → 50% max speed.
+- Cars are the primitive 3D hypercar (boxes/cylinders), not sprite sheets. Yaw/lean from lateral speed; chase cam stays on road heading.
 
 ## Controls
 

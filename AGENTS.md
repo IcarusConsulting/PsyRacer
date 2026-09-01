@@ -2,16 +2,24 @@
 
 Godot 4.7.2 Forward+ night-highway racer by **DiamondHand.Dev**.
 
+This file auto-loads for Grok on **any PC** whose cwd is this repo (local clone or LAN share).
+
 | | |
 | --- | --- |
-| Local | `C:\Users\gotch\PsyRacer-Godot` |
 | GitHub | https://github.com/IcarusConsulting/PsyRacer (`main`) |
-| Engine | `C:\Users\gotch\OneDrive\Desktop\Godot_v4.7.2-stable_win64.exe` |
+| LAN mirror | `\\192.168.1.72\fast\Developer\PsyRacer-Godot` |
+| This workstation | `C:\Users\gotch\PsyRacer-Godot` |
 | Version | `config/version` in `project.godot` (alpha; git tag `v` + that number) |
 | Look bible | `assets/PsyRacerSplash.jpg` |
 | Main scene | `scenes/boot.tscn` |
+| Playbook | `.grok/skills/godot-github/SKILL.md` (also `\\192.168.1.72\fast\Developer\.grok\skills\`) |
 
-Git/Godot/push mechanics for this PC: user skill **godot-github** (`~/.grok/skills/godot-github/SKILL.md`).
+On a new Grok Build PC, either open this folder as cwd or add to `~/.grok/config.toml`:
+
+```toml
+[skills]
+paths = ["\\\\192.168.1.72\\fast\\Developer\\.grok\\skills"]
+```
 
 ## Design locks (do not regress)
 

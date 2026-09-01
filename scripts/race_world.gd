@@ -4,7 +4,7 @@ extends Node3D
 static var start_mode: RaceSim.Mode = RaceSim.Mode.STANDARD
 
 const LANE_HALF := 7.0
-const ROAD_HALF := 7.6
+const ROAD_HALF := 12.0
 const LOOK_AHEAD := 220.0
 const LOOK_BEHIND := 18.0
 const Z_STEP := 2.0
@@ -23,6 +23,7 @@ var _player: HyperCar
 var _ai_nodes: Array[HyperCar] = []
 var _camera: Camera3D
 var _road: MeshInstance3D
+var _land: MeshInstance3D
 var _skyline: MeshInstance3D
 var _rain: MeshInstance3D
 var _env: Environment
@@ -36,6 +37,8 @@ var _finish_hold := 0.0
 var _lamp_root: Node3D
 var _prev_player_x := 0.0
 var _prev_ai_x: Array[float] = []
+var _camera_offset: Vector3 = Vector3(0.0, 2.35, -9.2)
+var _skyline_heading := PI
 
 
 func _ready() -> void:
@@ -49,8 +52,12 @@ func _ready() -> void:
 func _build_world() -> void:
 	var we := WorldEnvironment.new()
 	var env := Environment.new()
-	env.background_mode = Environment.BG_COLOR
-	env.background_color = Color(0.012, 0.016, 0.04)
+	var sky := Sky.new()
+	var sky_shader_mat := ShaderMaterial.new()
+	sky_shader_mat.shader = load("res://assets/sky/SkyStar.gdshader")
+	sky.sky_material = sky_shader_mat
+	env.background_mode = Environment.BG_SKY
+	env.sky = sky
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.15, 0.22, 0.4)
 	env.ambient_light_energy = 0.4
@@ -88,6 +95,15 @@ func _build_world() -> void:
 	add_child(_road)
 	_rebuild_road(true)
 
+	_land = MeshInstance3D.new()
+	_land.name = "HorizonLand"
+	var land_mesh := PlaneMesh.new()
+	land_mesh.size = Vector2(2400.0, 2400.0)
+	_land.mesh = land_mesh
+	_land.material_override = _road_mat(Color(0.012, 0.018, 0.028), 0.92)
+	_land.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(_land)
+
 	_player = HyperCar.new()
 	_player.is_player = true
 	_player.number = 1
@@ -117,11 +133,11 @@ func _build_world() -> void:
 	var quad := QuadMesh.new()
 	quad.size = Vector2(640, 36)
 	_skyline.mesh = quad
-	var sky_mat := ShaderMaterial.new()
-	sky_mat.shader = load("res://shaders/skyline.gdshader")
-	sky_mat.set_shader_parameter("skyline_tex", load("res://assets/sprites/horizon_skyline.png"))
-	sky_mat.set_shader_parameter("brightness", 16.0)
-	_skyline.material_override = sky_mat
+	var city_mat := ShaderMaterial.new()
+	city_mat.shader = load("res://shaders/skyline.gdshader")
+	city_mat.set_shader_parameter("skyline_tex", load("res://assets/sprites/horizon_skyline.png"))
+	city_mat.set_shader_parameter("brightness", 16.0)
+	_skyline.material_override = city_mat
 	add_child(_skyline)
 
 	_rain = MeshInstance3D.new()
@@ -152,11 +168,14 @@ func _build_world() -> void:
 	add_child(_lamp_root)
 
 	_camera = Camera3D.new()
-	_camera.fov = 62.0
+	_camera.fov = 66.0
 	_camera.near = 0.15
 	_camera.far = 520.0
 	add_child(_camera)
 	_camera.current = true
+	_camera_offset = Vector3(0.0, 2.35, -9.2)
+	_camera.position = _player.global_position + _camera_offset
+	_skyline_heading = PI
 
 
 func _build_hud() -> void:
@@ -267,13 +286,12 @@ func _wash_from_lightbars() -> void:
 
 func _sync_transforms(delta: float) -> void:
 	var ppos := sim.world_pos(sim.distance, sim.player_x)
-	ppos.y = 0.0
 	_player.global_position = ppos
 	var heading := -RaceSim.road_curve(sim.distance + 6.0) * 0.45
 	var dt := maxf(delta, 0.0001)
 	var player_slide := clampf((sim.player_x - _prev_player_x) / dt * 1.6, -1.0, 1.0)
 	_prev_player_x = sim.player_x
-	_player.pose(heading, player_slide, delta)
+	_player.pose(heading + (PI if sim.reversing else 0.0), player_slide, delta)
 
 	for i in _ai_nodes.size():
 		var r: RaceSim.Racer = sim.cars[i]
@@ -291,11 +309,16 @@ func _sync_transforms(delta: float) -> void:
 	if start_mode == RaceSim.Mode.ENFORCEMENT or start_mode == RaceSim.Mode.CHASE:
 		_wash_from_lightbars()
 
-	var cam_back := Vector3(sin(heading) * 8.2, 2.15, -cos(heading) * 8.2)
-	var cam_pos := ppos + cam_back + Vector3(0, 0, 0)
-	cam_pos.y = 2.15
-	var look := ppos + Vector3(-sin(heading) * 14.0, 0.7, cos(heading) * 14.0)
-	_camera.look_at_from_position(cam_pos, look, Vector3.UP)
+	var cam_offset := _camera_offset
+	if sim.reversing:
+		cam_offset = Vector3(0.0, 2.35, 9.2)
+	var cam_pos := ppos + cam_offset
+	cam_pos.y = ppos.y + cam_offset.y
+	var look := ppos + Vector3(0.0, 0.9, -24.0 if sim.reversing else 24.0)
+	_camera.global_position = cam_pos
+	_camera.look_at(look, Vector3.UP)
+	if _land:
+		_land.global_position = Vector3(_camera.global_position.x, -12.0, _camera.global_position.z)
 
 
 func _road_mat(color: Color, rough: float) -> StandardMaterial3D:
@@ -304,6 +327,10 @@ func _road_mat(color: Color, rough: float) -> StandardMaterial3D:
 	m.metallic = 0.35
 	m.roughness = rough
 	return m
+
+
+func _road_height(z: float) -> float:
+	return sim.terrain_height(z)
 
 
 func _rebuild_road(force: bool) -> void:
@@ -319,10 +346,12 @@ func _rebuild_road(force: bool) -> void:
 		var z2 := z + Z_STEP
 		var c0 := RaceSim.road_center(z)
 		var c1 := RaceSim.road_center(z2)
-		var l0 := Vector3(c0 - ROAD_HALF, 0.0, z)
-		var r0 := Vector3(c0 + ROAD_HALF, 0.0, z)
-		var l1 := Vector3(c1 - ROAD_HALF, 0.0, z2)
-		var r1 := Vector3(c1 + ROAD_HALF, 0.0, z2)
+		var y0 := _road_height(z)
+		var y1 := _road_height(z2)
+		var l0 := Vector3(c0 - ROAD_HALF, y0, z)
+		var r0 := Vector3(c0 + ROAD_HALF, y0, z)
+		var l1 := Vector3(c1 - ROAD_HALF, y1, z2)
+		var r1 := Vector3(c1 + ROAD_HALF, y1, z2)
 		_quad(st, l0, r0, r1, l1)
 		z = z2
 	var mesh := st.commit()
@@ -343,11 +372,13 @@ func _rebuild_road(force: bool) -> void:
 		var z2 := z + Z_STEP
 		var c0 := RaceSim.road_center(z)
 		var c1 := RaceSim.road_center(z2)
+		var y0 := _road_height(z)
+		var y1 := _road_height(z2)
 		for side: float in [-1.0, 1.0]:
-			var a := Vector3(c0 + side * ROAD_HALF, -0.02, z)
-			var b := Vector3(c0 + side * (ROAD_HALF + 18.0), -0.02, z)
-			var c := Vector3(c1 + side * (ROAD_HALF + 18.0), -0.02, z2)
-			var d := Vector3(c1 + side * ROAD_HALF, -0.02, z2)
+			var a := Vector3(c0 + side * ROAD_HALF, y0 - 0.02, z)
+			var b := Vector3(c0 + side * (ROAD_HALF + 18.0), y0 - 0.02, z)
+			var c := Vector3(c1 + side * (ROAD_HALF + 18.0), y1 - 0.02, z2)
+			var d := Vector3(c1 + side * ROAD_HALF, y1 - 0.02, z2)
 			if side > 0.0:
 				_quad(ss, a, b, c, d)
 			else:
@@ -366,33 +397,240 @@ func _rebuild_road(force: bool) -> void:
 	ms.begin(Mesh.PRIMITIVE_TRIANGLES)
 	z = z0
 	while z < z1:
+		var z2 := minf(z + 2.6, z1)
+		var c0 := RaceSim.road_center(z)
+		var c1 := RaceSim.road_center(z2)
+		var y0 := _road_height(z)
+		var y1 := _road_height(z2)
 		var dash_on := int(floor(z / 4.0)) % 2 == 0
-		if dash_on:
-			var z2 := minf(z + 2.4, z1)
-			var c0 := RaceSim.road_center(z)
-			var c1 := RaceSim.road_center(z2)
-			var w := 0.12
+		for side: float in [-1.0, 1.0]:
+			var outer0: float = c0 + side * (ROAD_HALF - 0.18)
+			var outer1: float = c1 + side * (ROAD_HALF - 0.18)
 			_quad(ms,
-				Vector3(c0 - w, 0.03, z),
-				Vector3(c0 + w, 0.03, z),
-				Vector3(c1 + w, 0.03, z2),
-				Vector3(c1 - w, 0.03, z2))
-			for side: float in [-1.0, 1.0]:
-				var e0: float = c0 + side * (ROAD_HALF - 0.18)
-				var e1: float = c1 + side * (ROAD_HALF - 0.18)
+				Vector3(outer0 - 0.10, y0 + 0.03, z),
+				Vector3(outer0 + 0.10, y0 + 0.03, z),
+				Vector3(outer1 + 0.10, y1 + 0.03, z2),
+				Vector3(outer1 - 0.10, y1 + 0.03, z2))
+		var center0 := c0
+		var center1 := c1
+		_quad(ms,
+			Vector3(center0 - 0.22, y0 + 0.03, z),
+			Vector3(center0 - 0.08, y0 + 0.03, z),
+			Vector3(center1 - 0.08, y1 + 0.03, z2),
+			Vector3(center1 - 0.22, y1 + 0.03, z2))
+		_quad(ms,
+			Vector3(center0 + 0.08, y0 + 0.03, z),
+			Vector3(center0 + 0.22, y0 + 0.03, z),
+			Vector3(center1 + 0.22, y1 + 0.03, z2),
+			Vector3(center1 + 0.08, y1 + 0.03, z2))
+		if dash_on:
+			for lane_sep: float in [-4.0, 4.0]:
+				var d0: float = c0 + lane_sep * 1.5
+				var d1: float = c1 + lane_sep * 1.5
 				_quad(ms,
-					Vector3(e0 - 0.08, 0.03, z),
-					Vector3(e0 + 0.08, 0.03, z),
-					Vector3(e1 + 0.08, 0.03, z2),
-					Vector3(e1 - 0.08, 0.03, z2))
+					Vector3(d0 - 0.08, y0 + 0.02, z),
+					Vector3(d0 + 0.08, y0 + 0.02, z),
+					Vector3(d1 + 0.08, y1 + 0.02, z2),
+					Vector3(d1 - 0.08, y1 + 0.02, z2))
 		z += 2.0
-	var mm := ms.commit()
-	var mark_mat := _road_mat(Color(0.95, 0.85, 0.25), 0.4)
-	mark_mat.emission_enabled = true
-	mark_mat.emission = Color(1.0, 0.8, 0.2)
-	mark_mat.emission_energy_multiplier = 0.6
-	mm.surface_set_material(0, mark_mat)
-	marks.mesh = mm
+	var amber := _road_mat(Color(0.95, 0.72, 0.15), 0.45)
+	amber.emission_enabled = true
+	amber.emission = Color(1.0, 0.68, 0.14)
+	amber.emission_energy_multiplier = 0.7
+	var white := _road_mat(Color(0.95, 0.96, 0.97), 0.35)
+	white.emission_enabled = true
+	white.emission = Color(0.95, 0.97, 1.0)
+	white.emission_energy_multiplier = 0.25
+	var yellow := _road_mat(Color(0.96, 0.82, 0.18), 0.35)
+	yellow.emission_enabled = true
+	yellow.emission = Color(1.0, 0.80, 0.18)
+	yellow.emission_energy_multiplier = 0.4
+	var marking_mat := _road.get_node_or_null("MarkingMaterials") as Node3D
+	if marking_mat == null:
+		marking_mat = Node3D.new()
+		marking_mat.name = "MarkingMaterials"
+		_road.add_child(marking_mat)
+	var amber_marks := _road.get_node_or_null("AmberCenter") as MeshInstance3D
+	if amber_marks == null:
+		amber_marks = MeshInstance3D.new()
+		amber_marks.name = "AmberCenter"
+		_road.add_child(amber_marks)
+	var white_marks := _road.get_node_or_null("WhiteSeparators") as MeshInstance3D
+	if white_marks == null:
+		white_marks = MeshInstance3D.new()
+		white_marks.name = "WhiteSeparators"
+		_road.add_child(white_marks)
+	var yellow_marks := _road.get_node_or_null("YellowShoulders") as MeshInstance3D
+	if yellow_marks == null:
+		yellow_marks = MeshInstance3D.new()
+		yellow_marks.name = "YellowShoulders"
+		_road.add_child(yellow_marks)
+	var amber_st := SurfaceTool.new()
+	var white_st := SurfaceTool.new()
+	var yellow_st := SurfaceTool.new()
+	amber_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	white_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	yellow_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	z = z0
+	while z < z1:
+		var z2 := minf(z + 2.6, z1)
+		var c0 := RaceSim.road_center(z)
+		var c1 := RaceSim.road_center(z2)
+		var y0 := _road_height(z) + 0.035
+		var y1 := _road_height(z2) + 0.035
+		for side: float in [-1.0, 1.0]:
+			var edge0: float = c0 + side * (ROAD_HALF - 0.18)
+			var edge1: float = c1 + side * (ROAD_HALF - 0.18)
+			_quad(yellow_st, Vector3(edge0 - 0.10, y0, z), Vector3(edge0 + 0.10, y0, z), Vector3(edge1 + 0.10, y1, z2), Vector3(edge1 - 0.10, y1, z2))
+		_quad(amber_st, Vector3(c0 - 0.22, y0, z), Vector3(c0 - 0.08, y0, z), Vector3(c1 - 0.08, y1, z2), Vector3(c1 - 0.22, y1, z2))
+		_quad(amber_st, Vector3(c0 + 0.08, y0, z), Vector3(c0 + 0.22, y0, z), Vector3(c1 + 0.22, y1, z2), Vector3(c1 + 0.08, y1, z2))
+		if int(floor(z / 4.0)) % 2 == 0:
+			for lane_sep: float in [-4.0, 4.0]:
+				var d0: float = c0 + lane_sep * 1.5
+				var d1: float = c1 + lane_sep * 1.5
+				_quad(white_st, Vector3(d0 - 0.08, y0, z), Vector3(d0 + 0.08, y0, z), Vector3(d1 + 0.08, y1, z2), Vector3(d1 - 0.08, y1, z2))
+		z += 2.0
+	var amber_mesh := amber_st.commit()
+	var white_mesh := white_st.commit()
+	var yellow_mesh := yellow_st.commit()
+	amber_mesh.surface_set_material(0, amber)
+	white_mesh.surface_set_material(0, white)
+	yellow_mesh.surface_set_material(0, yellow)
+	amber_marks.mesh = amber_mesh
+	white_marks.mesh = white_mesh
+	yellow_marks.mesh = yellow_mesh
+	marks.visible = false
+
+	var tunnel := _road.get_node_or_null("TunnelShell") as MeshInstance3D
+	if tunnel == null:
+		tunnel = MeshInstance3D.new()
+		tunnel.name = "TunnelShell"
+		_road.add_child(tunnel)
+	var tunnel_st := SurfaceTool.new()
+	tunnel_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var tunnel_len := 1600.0
+	var tunnel_center := sim.finish_distance * (1.0 / 3.0)
+	var tunnel_start := tunnel_center - tunnel_len * 0.5
+	var tunnel_end := tunnel_center + tunnel_len * 0.5
+	var tunnel_z := tunnel_start
+	while tunnel_z < tunnel_end:
+		var tunnel_z2 := minf(tunnel_z + 16.0, tunnel_end)
+		var ty0 := _road_height(tunnel_z)
+		var ty1 := _road_height(tunnel_z2)
+		for side: float in [-1.0, 1.0]:
+			var wall_x := ROAD_HALF + 2.4
+			var wall_a := Vector3(side * wall_x, ty0 - 4.0, tunnel_z)
+			var wall_b := Vector3(side * wall_x, ty0 + 6.2, tunnel_z)
+			var wall_c := Vector3(side * wall_x, ty1 + 6.2, tunnel_z2)
+			var wall_d := Vector3(side * wall_x, ty1 - 4.0, tunnel_z2)
+			_quad(tunnel_st, wall_a, wall_b, wall_c, wall_d)
+		var roof_a := Vector3(-ROAD_HALF - 2.4, ty0 + 6.2, tunnel_z)
+		var roof_b := Vector3(ROAD_HALF + 2.4, ty0 + 6.2, tunnel_z)
+		var roof_c := Vector3(ROAD_HALF + 2.4, ty1 + 6.2, tunnel_z2)
+		var roof_d := Vector3(-ROAD_HALF - 2.4, ty1 + 6.2, tunnel_z2)
+		_quad(tunnel_st, roof_a, roof_b, roof_c, roof_d)
+		tunnel_z += 16.0
+	var tunnel_mesh := tunnel_st.commit()
+	var tunnel_mat := _road_mat(Color(0.34, 0.37, 0.41), 0.84)
+	tunnel_mat.albedo_color = Color(0.34, 0.37, 0.41)
+	tunnel_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	tunnel_mesh.surface_set_material(0, tunnel_mat)
+	tunnel.mesh = tunnel_mesh
+	var tunnel_lights := _road.get_node_or_null("TunnelLights") as Node3D
+	if tunnel_lights == null:
+		tunnel_lights = Node3D.new()
+		tunnel_lights.name = "TunnelLights"
+		_road.add_child(tunnel_lights)
+		var light_z := tunnel_start + 40.0
+		while light_z < tunnel_end - 20.0:
+			var fixture := MeshInstance3D.new()
+			var fixture_mesh := BoxMesh.new()
+			fixture_mesh.size = Vector3(1.2, 0.10, 0.35)
+			fixture.mesh = fixture_mesh
+			fixture.position = Vector3(0.0, _road_height(light_z) + 5.85, light_z)
+			var fixture_mat := StandardMaterial3D.new()
+			fixture_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+			fixture_mat.albedo_color = Color(0.8, 0.9, 1.0)
+			fixture_mat.emission_enabled = true
+			fixture_mat.emission = Color(0.65, 0.82, 1.0)
+			fixture_mat.emission_energy_multiplier = 3.0
+			fixture.material_override = fixture_mat
+			tunnel_lights.add_child(fixture)
+			var cone := SpotLight3D.new()
+			cone.position = Vector3(0.0, _road_height(light_z) + 5.65, light_z)
+			cone.rotation_degrees = Vector3(90.0, 0.0, 0.0)
+			cone.light_color = Color(0.65, 0.8, 1.0)
+			cone.light_energy = 3.2
+			cone.spot_range = 14.0
+			cone.spot_angle = 95.0
+			cone.spot_angle_attenuation = 0.65
+			cone.shadow_enabled = false
+			tunnel_lights.add_child(cone)
+			light_z += 80.0
+
+	var bridge := _road.get_node_or_null("BridgeShell") as MeshInstance3D
+	if bridge == null:
+		bridge = MeshInstance3D.new()
+		bridge.name = "BridgeShell"
+		_road.add_child(bridge)
+	var bridge_st := SurfaceTool.new()
+	bridge_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var bridge_len := 1600.0
+	var bridge_center := sim.finish_distance * (2.0 / 3.0)
+	var bridge_start := bridge_center - bridge_len * 0.5
+	var bridge_end := bridge_center + bridge_len * 0.5
+	var bridge_z := bridge_start
+	while bridge_z < bridge_end:
+		var bridge_z2 := minf(bridge_z + 20.0, bridge_end)
+		var by0 := _road_height(bridge_z)
+		var by1 := _road_height(bridge_z2)
+		var deck_a := Vector3(-ROAD_HALF, by0 - 0.34, bridge_z)
+		var deck_b := Vector3(ROAD_HALF, by0 - 0.34, bridge_z)
+		var deck_c := Vector3(ROAD_HALF, by1 - 0.34, bridge_z2)
+		var deck_d := Vector3(-ROAD_HALF, by1 - 0.34, bridge_z2)
+		_quad(bridge_st, deck_a, deck_b, deck_c, deck_d)
+		for side: float in [-1.0, 1.0]:
+			var rail_x := side * (ROAD_HALF + 0.28)
+			var rail_a := Vector3(rail_x, by0 + 0.82, bridge_z)
+			var rail_b := Vector3(rail_x, by0 + 1.28, bridge_z)
+			var rail_c := Vector3(rail_x, by1 + 1.28, bridge_z2)
+			var rail_d := Vector3(rail_x, by1 + 0.82, bridge_z2)
+			_quad(bridge_st, rail_a, rail_b, rail_c, rail_d)
+			var girder_x := side * (ROAD_HALF + 2.8)
+			var girder_a := Vector3(girder_x, by0 - 6.0, bridge_z)
+			var girder_b := Vector3(girder_x, by0 - 2.4, bridge_z)
+			var girder_c := Vector3(girder_x, by1 - 2.4, bridge_z2)
+			var girder_d := Vector3(girder_x, by1 - 6.0, bridge_z2)
+			_quad(bridge_st, girder_a, girder_b, girder_c, girder_d)
+		bridge_z += 20.0
+	var bridge_mesh := bridge_st.commit()
+	var bridge_mat := _road_mat(Color(0.38, 0.41, 0.45), 0.78)
+	bridge_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	bridge_mesh.surface_set_material(0, bridge_mat)
+	bridge.mesh = bridge_mesh
+
+	var bridge_supports := _road.get_node_or_null("BridgeSupports") as MeshInstance3D
+	if bridge_supports == null:
+		bridge_supports = MeshInstance3D.new()
+		bridge_supports.name = "BridgeSupports"
+		_road.add_child(bridge_supports)
+	var support_st := SurfaceTool.new()
+	support_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var support_z := bridge_start
+	while support_z <= bridge_end:
+		for side: float in [-1.0, 1.0]:
+			var sx := side * (ROAD_HALF + 3.8)
+			var support_a := Vector3(sx, _road_height(support_z) - 7.2, support_z)
+			var support_b := Vector3(sx, _road_height(support_z) + 1.1, support_z)
+			var support_c := Vector3(sx, _road_height(support_z) + 1.1, support_z + 18.0)
+			var support_d := Vector3(sx, _road_height(support_z) - 7.2, support_z + 18.0)
+			_quad(support_st, support_a, support_b, support_c, support_d)
+		support_z += 80.0
+	var support_mesh := support_st.commit()
+	var support_mat := _road_mat(Color(0.42, 0.44, 0.47), 0.82)
+	support_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	support_mesh.surface_set_material(0, support_mat)
+	bridge_supports.mesh = support_mesh
 
 
 func _quad(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3, d: Vector3) -> void:
@@ -423,9 +661,8 @@ func _update_horizon() -> void:
 
 	var z := sim.distance + dist_ahead
 	var x := RaceSim.road_center(z)
-	var heading := -RaceSim.road_curve(sim.distance + 6.0) * 0.45
 	# Quad faces +Z; rotate so the city faces the incoming camera.
-	var face := heading + PI
+	var face := _skyline_heading
 	_skyline.global_position = Vector3(x, city_h * 0.5, z)
 	_skyline.rotation = Vector3(0.0, face, 0.0)
 
@@ -452,11 +689,14 @@ func _update_scenery() -> void:
 	var endz := int(sim.distance + LOOK_AHEAD)
 	z -= z % 4
 	while z < endz:
-		if z % 32 == 0:
-			want["l%d" % z] = [z, 1.16, true]
-		if z % 32 == 16:
-			want["r%d" % z] = [z, -1.16, true]
-		if z >= SIGN_SPACING and z % SIGN_SPACING == 0:
+		var tunnel_start := int(sim.finish_distance / 3.0) - 800
+		var tunnel_end := int(sim.finish_distance / 3.0) + 800
+		var in_tunnel := z >= tunnel_start and z <= tunnel_end
+		if z % 32 == 0 and not in_tunnel:
+			want["l%d" % z] = [z, 2.05, true]
+		if z % 32 == 16 and not in_tunnel:
+			want["r%d" % z] = [z, -2.05, true]
+		if z >= SIGN_SPACING and z % SIGN_SPACING == 0 and not in_tunnel:
 			want["s%d" % z] = [z, 0.0, true]
 		z += 4
 
@@ -718,9 +958,6 @@ func _update_hud() -> void:
 
 
 func _highway_font() -> Font:
-	var bundled: Font = load("res://assets/fonts/YuGothR.ttc")
-	if bundled != null:
-		return bundled
 	var sys := SystemFont.new()
 	sys.font_names = PackedStringArray(["Yu Gothic", "Yu Gothic UI", "Meiryo", "MS Gothic", "Noto Sans CJK JP"])
 	return sys

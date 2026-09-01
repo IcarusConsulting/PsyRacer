@@ -11,6 +11,7 @@ const BUST_KMH := 50.0
 const POLICE_MERGE_Z := 3000.0
 const POLICE_SHOULDER_X := 1.22
 const POLICE_SPEED_SCALE := 1.0
+const SPEED_SCALE := 0.5
 
 enum Difficulty { EASY, MEDIUM, HARD }
 enum Mode { STANDARD, CHASE, ENFORCEMENT }
@@ -48,12 +49,14 @@ var difficulty: Difficulty = Difficulty.MEDIUM
 var mode: Mode = Mode.STANDARD
 var finish_distance: float = 20000.0
 var max_speed: float = 1.65
+var reverse_max_speed: float = 0.825
 var accel: float = 0.022
 var ai_speed_scale: float = 0.96
 
 var distance: float = 0.0
 var player_x: float = 0.0
 var speed: float = 0.0
+var reversing: bool = false
 var cars: Array[Racer] = []
 var crashed: bool = false
 var crash_timer: float = 0.0
@@ -72,13 +75,15 @@ func setup(p_mode: Mode) -> void:
 	mode = p_mode
 	difficulty = Difficulty.MEDIUM
 	var cfg: Dictionary = difficulty_table[Difficulty.MEDIUM]
-	max_speed = cfg["max_speed"]
+	max_speed = cfg["max_speed"] * SPEED_SCALE
+	reverse_max_speed = max_speed * 0.5
 	accel = cfg["accel"]
 	finish_distance = cfg["finish"]
 	ai_speed_scale = cfg["ai_speed"]
 	distance = 0.0
 	player_x = 0.0
 	speed = 0.0
+	reversing = false
 	crashed = false
 	crash_timer = 0.0
 	overlapping.clear()
@@ -121,7 +126,30 @@ static func road_curve(z: float) -> float:
 
 
 static func road_center(z: float) -> float:
-	return road_curve(z) * 12.0
+	var finish := 20000.0
+	var tunnel_len := 1600.0
+	var bridge_len := 1600.0
+	var blend_len := 240.0
+	var tunnel_center := finish * (1.0 / 3.0)
+	var bridge_center := finish * (2.0 / 3.0)
+	var normal := road_curve(z) * 12.0
+	var tunnel_start := tunnel_center - tunnel_len * 0.5
+	var tunnel_end := tunnel_center + tunnel_len * 0.5
+	var bridge_start := bridge_center - bridge_len * 0.5
+	var bridge_end := bridge_center + bridge_len * 0.5
+	if z >= tunnel_start - blend_len and z <= tunnel_start:
+		return lerpf(normal, 0.0, smoothstep(tunnel_start - blend_len, tunnel_start, z))
+	if z >= tunnel_start and z <= tunnel_end:
+		return 0.0
+	if z >= tunnel_end and z <= tunnel_end + blend_len:
+		return lerpf(0.0, normal, smoothstep(tunnel_end, tunnel_end + blend_len, z))
+	if z >= bridge_start - blend_len and z <= bridge_start:
+		return lerpf(normal, 0.0, smoothstep(bridge_start - blend_len, bridge_start, z))
+	if z >= bridge_start and z <= bridge_end:
+		return 0.0
+	if z >= bridge_end and z <= bridge_end + blend_len:
+		return lerpf(0.0, normal, smoothstep(bridge_end, bridge_end + blend_len, z))
+	return normal
 
 
 func tick(delta: float, steer: float, throttle: float, brake: float) -> void:
@@ -160,22 +188,27 @@ func tick(delta: float, steer: float, throttle: float, brake: float) -> void:
 
 	if racing and not finished:
 		if throttle > 0.0:
+			reversing = false
 			speed += accel * step * throttle
 		if brake > 0.0:
-			speed -= accel * 1.4 * step * brake
-		speed -= 0.006 * step
-		speed = clampf(speed, 0.0, max_speed)
+			if speed > 0.01:
+				speed -= accel * 1.4 * step * brake
+			else:
+				reversing = true
+				speed += accel * 0.85 * step * brake
+		if reversing and throttle <= 0.0:
+			speed -= 0.006 * step
+		else:
+			speed -= 0.006 * step
+		speed = clampf(speed, 0.0, reverse_max_speed if reversing else max_speed)
 
 		var curve := road_curve(distance + 8.0)
 		player_x += steer * (0.045 + speed * 0.03) * step
 		player_x += curve * speed * 0.018 * step
-		if absf(player_x) > 0.92:
-			speed *= pow(0.94, step)
-			player_x = clampf(player_x, -1.15, 1.15)
-		else:
-			player_x = clampf(player_x, -1.08, 1.08)
+		player_x = clampf(player_x, -1.65, 1.65)
 
-		distance += speed * DIST_PER_SPEED * step
+		distance += (-speed if reversing else speed) * DIST_PER_SPEED * step
+		distance = maxf(distance, 0.0)
 		_update_ai(step)
 		_collide()
 		_check_bust()
@@ -294,6 +327,27 @@ func field_size() -> int:
 	return rivals_left() + 1
 
 
+func terrain_height(z: float) -> float:
+	var finish := maxf(finish_distance, 1.0)
+	var structure_length := 1600.0
+	var tunnel_center := finish * (1.0 / 3.0)
+	var bridge_center := finish * (2.0 / 3.0)
+	var tunnel_start := tunnel_center - structure_length * 0.5
+	var tunnel_end := tunnel_center + structure_length * 0.5
+	var bridge_start := bridge_center - structure_length * 0.5
+	var bridge_end := bridge_center + structure_length * 0.5
+	var h := 0.0
+	if z >= tunnel_start and z <= tunnel_end:
+		var t := clampf((z - tunnel_start) / structure_length, 0.0, 1.0)
+		var eased := 0.5 - 0.5 * cos(TAU * t)
+		h -= 6.0 * eased
+	if z >= bridge_start and z <= bridge_end:
+		var t := clampf((z - bridge_start) / structure_length, 0.0, 1.0)
+		var eased := 0.5 - 0.5 * cos(TAU * t)
+		h += 16.0 * eased
+	return h
+
+
 func world_pos(z: float, x_lane: float) -> Vector3:
 	var half := 7.0
-	return Vector3(road_center(z) + x_lane * half, 0.0, z)
+	return Vector3(road_center(z) + x_lane * half, terrain_height(z), z)

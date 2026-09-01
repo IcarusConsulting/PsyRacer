@@ -127,24 +127,38 @@ theme_override_constants/separation = 16
 alignment = 1
 
 [node name="Standard" type="Button" parent="Panel" unique_id=1328717506]
+visible = false
 custom_minimum_size = Vector2(190, 56)
 layout_mode = 2
 text = "STANDARD"
 
 [node name="Chase" type="Button" parent="Panel" unique_id=420780881]
+visible = false
 custom_minimum_size = Vector2(150, 56)
 layout_mode = 2
 text = "CHASE"
 
 [node name="Enforcement" type="Button" parent="Panel" unique_id=1178963035]
+visible = false
 custom_minimum_size = Vector2(230, 56)
 layout_mode = 2
 text = "ENFORCEMENT"
 
 [node name="Start" type="Button" parent="Panel" unique_id=1760050906]
+visible = false
 custom_minimum_size = Vector2(180, 56)
 layout_mode = 2
 text = "START"
+
+[node name="Mode" type="Button" parent="Panel"]
+custom_minimum_size = Vector2(180, 56)
+layout_mode = 2
+text = "MODE"
+
+[node name="Options" type="Button" parent="Panel"]
+custom_minimum_size = Vector2(180, 56)
+layout_mode = 2
+text = "OPTIONS"
 
 [node name="Hint" type="Label" parent="." unique_id=1152490099]
 layout_mode = 1

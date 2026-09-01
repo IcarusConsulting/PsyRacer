@@ -1,7 +1,7 @@
 class_name RaceWorld
 extends Node3D
 
-static var start_difficulty: RaceSim.Difficulty = RaceSim.Difficulty.MEDIUM
+static var start_mode: RaceSim.Mode = RaceSim.Mode.STANDARD
 
 const LANE_HALF := 7.0
 const ROAD_HALF := 7.6
@@ -40,7 +40,7 @@ var _prev_ai_x: Array[float] = []
 
 func _ready() -> void:
 	sim = RaceSim.new()
-	sim.setup(start_difficulty)
+	sim.setup(start_mode)
 	_build_world()
 	_build_hud()
 	_update_horizon()
@@ -91,22 +91,24 @@ func _build_world() -> void:
 	_player = HyperCar.new()
 	_player.is_player = true
 	_player.number = 1
+	if start_mode == RaceSim.Mode.ENFORCEMENT:
+		_player.model_path = "res://assets/cars/police.glb"
+	else:
+		_player.model_path = "res://assets/cars/player.glb"
 	add_child(_player)
+	if start_mode == RaceSim.Mode.ENFORCEMENT:
+		_player.enable_lightbar()
 
-	var ai_look := [
-		[Color(0.03, 0.04, 0.05), Color(1.0, 0.35, 0.7), Color(0.4, 0.9, 1.0)],
-		[Color(0.04, 0.03, 0.05), Color(0.4, 1.0, 0.7), Color(1.0, 0.5, 0.15)],
-		[Color(0.05, 0.04, 0.03), Color(1.0, 0.85, 0.2), Color(0.3, 0.8, 1.0)],
-		[Color(0.04, 0.05, 0.04), Color(1.0, 0.25, 0.2), Color(0.5, 0.9, 1.0)],
-		[Color(0.03, 0.03, 0.05), Color(0.7, 0.4, 1.0), Color(1.0, 0.45, 0.15)],
-	]
 	for i in sim.cars.size():
 		var car := HyperCar.new()
 		car.number = sim.cars[i].number
-		car.body = ai_look[i][0]
-		car.orange = ai_look[i][1]
-		car.cyan = ai_look[i][2]
+		if sim.cars[i].is_police:
+			car.model_path = "res://assets/cars/police.glb"
+		else:
+			car.model_path = "res://assets/cars/ghost.glb"
 		add_child(car)
+		if sim.cars[i].is_police:
+			car.enable_lightbar()
 		_ai_nodes.append(car)
 		_prev_ai_x.append(sim.cars[i].x)
 
@@ -192,14 +194,26 @@ func _make_label(parent: Control, pos: Vector2, size: int) -> Label:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if not is_inside_tree():
+		return
 	if event.is_pressed() and event is InputEventKey:
 		var k := event as InputEventKey
 		if k.physical_keycode == KEY_ESCAPE:
-			get_tree().change_scene_to_file("res://scenes/boot.tscn")
 			get_viewport().set_input_as_handled()
+			_go_title()
+
+
+func _go_title() -> void:
+	if not is_inside_tree():
+		return
+	set_process(false)
+	set_process_unhandled_input(false)
+	get_tree().change_scene_to_file("res://scenes/boot.tscn")
 
 
 func _process(delta: float) -> void:
+	if not is_inside_tree():
+		return
 	var steer := 0.0
 	var throttle := 0.0
 	var brake := 0.0
@@ -222,7 +236,33 @@ func _process(delta: float) -> void:
 	if sim.finished:
 		_finish_hold += delta
 		if _finish_hold > 2.2:
-			get_tree().change_scene_to_file("res://scenes/boot.tscn")
+			_go_title()
+
+
+func _wash_from_lightbars() -> void:
+	var sources: Array[HyperCar] = []
+	if _player.has_lightbar():
+		sources.append(_player)
+	for c in _ai_nodes:
+		if c.has_lightbar():
+			sources.append(c)
+	if sources.is_empty():
+		return
+	var targets: Array[HyperCar] = [_player]
+	for c in _ai_nodes:
+		targets.append(c)
+	for t in targets:
+		var best := 0.0
+		var col := Color.BLACK
+		for s in sources:
+			if t == s or not s.visible:
+				continue
+			var amt := clampf(1.0 - t.global_position.distance_to(s.global_position) / 14.0, 0.0, 1.0)
+			amt *= amt
+			if amt > best:
+				best = amt
+				col = s.lightbar_color
+		t.set_proximity_wash(col, best)
 
 
 func _sync_transforms(delta: float) -> void:
@@ -237,6 +277,9 @@ func _sync_transforms(delta: float) -> void:
 
 	for i in _ai_nodes.size():
 		var r: RaceSim.Racer = sim.cars[i]
+		if r.removed:
+			_ai_nodes[i].visible = false
+			continue
 		var apos := sim.world_pos(r.z, r.x)
 		_ai_nodes[i].global_position = apos
 		var ai_heading := -RaceSim.road_curve(r.z + 6.0) * 0.45
@@ -244,6 +287,9 @@ func _sync_transforms(delta: float) -> void:
 		_prev_ai_x[i] = r.x
 		_ai_nodes[i].pose(ai_heading, ai_slide, delta)
 		_ai_nodes[i].visible = (r.z - sim.distance) > -8.0 and (r.z - sim.distance) < LOOK_AHEAD
+
+	if start_mode == RaceSim.Mode.ENFORCEMENT or start_mode == RaceSim.Mode.CHASE:
+		_wash_from_lightbars()
 
 	var cam_back := Vector3(sin(heading) * 8.2, 2.15, -cos(heading) * 8.2)
 	var cam_pos := ppos + cam_back + Vector3(0, 0, 0)
@@ -366,9 +412,9 @@ func _race_progress() -> float:
 
 func _update_horizon() -> void:
 	var t := _race_progress()
-	var ease := t * t * (3.0 - 2.0 * t)
+	var smoothed := t * t * (3.0 - 2.0 * t)
 	# Stay a thin far band early; rush in over the last third.
-	var approach := pow(ease, 1.15)
+	var approach := pow(smoothed, 1.15)
 	var dist_ahead := lerpf(310.0, 38.0, approach)
 	var city_h := lerpf(34.0, 128.0, approach)
 	var city_w := lerpf(620.0, 240.0, approach)
@@ -505,7 +551,7 @@ func _make_sign(key: String, z: int) -> Node3D:
 	n.add_child(badge)
 
 	var font: Font = _highway_font()
-	var idx := int(z / SIGN_SPACING) % SIGN_PLACES.size()
+	var idx := int(z / float(SIGN_SPACING)) % SIGN_PLACES.size()
 	var place: Array = SIGN_PLACES[idx]
 	var km := maxi(1, int(round((sim.finish_distance - float(z)) / 1000.0)))
 
@@ -638,17 +684,32 @@ func _make_lamp(key: String, z: int, lane: float) -> Node3D:
 
 
 func _update_hud() -> void:
-	var kmh := int(sim.speed * 180.0)
+	var kmh := int(sim.speed * RaceSim.KMH_SCALE)
 	_hud_speed.text = "%d KM/H" % kmh
-	_hud_place.text = "P%d / 6" % sim.race_place()
+	match sim.mode:
+		RaceSim.Mode.ENFORCEMENT:
+			_hud_place.text = "%d LEFT" % sim.rivals_left()
+		RaceSim.Mode.CHASE:
+			_hud_place.text = "CHASE" if sim.police_spawned else "CLEAR"
+		_:
+			_hud_place.text = "P%d / %d" % [sim.race_place(), sim.field_size()]
 	var left := maxf(0.0, sim.finish_distance - sim.distance)
 	_hud_dist.text = "%d m" % int(left)
 	if sim.countdown_text != "":
 		_hud_count.text = sim.countdown_text
 		_hud_count.modulate = Color(0.2, 1.0, 0.4) if sim.lights_stage == 4 else Color(1.0, 0.25, 0.2)
+	elif sim.busted:
+		_hud_count.text = "BUSTED"
+		_hud_count.modulate = Color(1.0, 0.2, 0.15)
+	elif sim.cleared:
+		_hud_count.text = "CLEARED"
+		_hud_count.modulate = Color(0.3, 0.9, 1.0)
 	elif sim.finished:
 		_hud_count.text = "FINISH"
 		_hud_count.modulate = Color(1.0, 0.85, 0.2)
+	elif sim.mode == RaceSim.Mode.ENFORCEMENT and sim.crashed:
+		_hud_count.text = "BUSTED"
+		_hud_count.modulate = Color(0.4, 0.75, 1.0)
 	elif sim.crashed:
 		_hud_count.text = "CONTACT"
 		_hud_count.modulate = Color(1.0, 0.4, 0.15)
@@ -663,4 +724,3 @@ func _highway_font() -> Font:
 	var sys := SystemFont.new()
 	sys.font_names = PackedStringArray(["Yu Gothic", "Yu Gothic UI", "Meiryo", "MS Gothic", "Noto Sans CJK JP"])
 	return sys
-

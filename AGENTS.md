@@ -7,8 +7,7 @@ This file auto-loads for Grok on **any PC** whose cwd is this repo (local clone 
 | | |
 | --- | --- |
 | GitHub | https://github.com/IcarusConsulting/PsyRacer (`main`) |
-| LAN mirror | `\\192.168.1.72\fast\Developer\PsyRacer-Godot` |
-| This workstation | `C:\Users\gotch\PsyRacer-Godot` |
+| Working copy | `\\192.168.1.72\fast\Developer\PsyRacer-Godot` (homeserver **fast** share) |
 | Version | `config/version` in `project.godot` (alpha; git tag `v` + that number) |
 | Look bible | `assets/PsyRacerSplash.jpg` |
 | Main scene | `scenes/boot.tscn` |
@@ -30,8 +29,8 @@ paths = ["\\\\192.168.1.72\\fast\\Developer\\.grok\\skills"]
 - Music: `assets/Background Music.mp3` loops from launch, `M` mutes, videos have no audio.
 - Lamps sit just outside the roadway, blue-white both sides.
 - Overhead NEXCO-style gantries every 2000 m (Yu Gothic / system CJK).
-- Easy 10 km / Medium 20 km / Hard 30 km; 5 AI; collision → 50% max speed.
-- Cars are the primitive 3D hypercar (boxes/cylinders), not sprite sheets. Yaw/lean from lateral speed; chase cam stays on road heading.
+- Title modes (all 20 km Medium): **Standard** (5 AI, collision → 50% max speed), **Chase** (cop merges at 3000 m, same top speed as player, ram chase, bust if player < 50 km/h), **Enforcement** (player is `police.glb`, 6 AI, rams remove AI with no player slowdown, win when none remain).
+- Cars: Standard/Chase player is `assets/cars/player.glb`. Enforcement player and Chase cop are `police.glb`. AI use `ghost.glb`. Yaw/lean from lateral speed; chase cam stays on road heading. Primitive boxes remain a fallback if a GLB fails to load.
 
 ## Controls
 

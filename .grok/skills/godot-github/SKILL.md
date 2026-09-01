@@ -21,11 +21,10 @@ MCP GitHub file tools cannot ship game binaries. Do not rediscover that.
 
 ## Project roots (first that exists)
 
-1. `C:\Users\gotch\PsyRacer-Godot` (this workstation)
-2. `\\192.168.1.72\fast\Developer\PsyRacer-Godot` (LAN mirror)
-3. Any git clone of `https://github.com/IcarusConsulting/PsyRacer` (`main`)
+1. `\\192.168.1.72\fast\Developer\PsyRacer-Godot` (homeserver **fast** working copy)
+2. Any git clone of `https://github.com/IcarusConsulting/PsyRacer` (`main`)
 
-Prefer the git root that has `origin` → `IcarusConsulting/PsyRacer`. After local edits, **push GitHub and mirror to the Developer share** unless the user says otherwise.
+Prefer the git root that has `origin` → `IcarusConsulting/PsyRacer` when committing. After a successful push, **mirror back to the Developer share** unless the user says otherwise. Do not keep a second clone on this workstation.
 
 ## Resolve tools (do not assume PATH)
 

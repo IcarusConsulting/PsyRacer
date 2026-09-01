@@ -2,19 +2,14 @@ extends Control
 
 const RaceScene := preload("res://scenes/race.tscn")
 
-var _diff: RaceSim.Difficulty = RaceSim.Difficulty.MEDIUM
+var _mode: RaceSim.Mode = RaceSim.Mode.STANDARD
 var _starting := false
 
 @onready var _bg: TextureRect = $Background
 @onready var _video: VideoStreamPlayer = $IntroVideo
-@onready var _title_border: Label = $TitleBorder
-@onready var _title: Label = $Title
-@onready var _byline: Label = $Byline
-@onready var _dim: ColorRect = $Dim
-@onready var _panel: HBoxContainer = $Panel
-@onready var _easy: Button = $Panel/Easy
-@onready var _med: Button = $Panel/Medium
-@onready var _hard: Button = $Panel/Hard
+@onready var _standard: Button = $Panel/Standard
+@onready var _chase: Button = $Panel/Chase
+@onready var _enforce: Button = $Panel/Enforcement
 @onready var _start: Button = $Panel/Start
 @onready var _hint: Label = $Hint
 @onready var _flash: ColorRect = $Flash
@@ -29,9 +24,9 @@ func _ready() -> void:
 	_video.volume_db = -80.0
 	_video.expand = true
 	_video.finished.connect(_on_video_finished)
-	_easy.pressed.connect(func() -> void: _diff = RaceSim.Difficulty.EASY; _refresh())
-	_med.pressed.connect(func() -> void: _diff = RaceSim.Difficulty.MEDIUM; _refresh())
-	_hard.pressed.connect(func() -> void: _diff = RaceSim.Difficulty.HARD; _refresh())
+	_standard.pressed.connect(func() -> void: _mode = RaceSim.Mode.STANDARD; _refresh())
+	_chase.pressed.connect(func() -> void: _mode = RaceSim.Mode.CHASE; _refresh())
+	_enforce.pressed.connect(func() -> void: _mode = RaceSim.Mode.ENFORCEMENT; _refresh())
 	_start.pressed.connect(_begin)
 	_refresh()
 	_start.grab_focus()
@@ -53,9 +48,16 @@ func _hold_first_frame() -> void:
 func _refresh() -> void:
 	if _starting:
 		return
-	_easy.modulate = Color(1, 1, 1, 0.55 if _diff != RaceSim.Difficulty.EASY else 1.0)
-	_med.modulate = Color(1, 1, 1, 0.55 if _diff != RaceSim.Difficulty.MEDIUM else 1.0)
-	_hard.modulate = Color(1, 1, 1, 0.55 if _diff != RaceSim.Difficulty.HARD else 1.0)
+	_standard.modulate = Color(1, 1, 1, 0.55 if _mode != RaceSim.Mode.STANDARD else 1.0)
+	_chase.modulate = Color(1, 1, 1, 0.55 if _mode != RaceSim.Mode.CHASE else 1.0)
+	_enforce.modulate = Color(1, 1, 1, 0.55 if _mode != RaceSim.Mode.ENFORCEMENT else 1.0)
+	match _mode:
+		RaceSim.Mode.CHASE:
+			_hint.text = "Outrun the cop after 3 km    stay above 50 km/h"
+		RaceSim.Mode.ENFORCEMENT:
+			_hint.text = "Ram all 6    you don't slow on impact"
+		_:
+			_hint.text = "20 km race    5 rivals    ENTER to start"
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -70,9 +72,9 @@ func _begin() -> void:
 	if _starting:
 		return
 	_starting = true
-	_easy.disabled = true
-	_med.disabled = true
-	_hard.disabled = true
+	_standard.disabled = true
+	_chase.disabled = true
+	_enforce.disabled = true
 	_start.disabled = true
 
 	var rain_mat := _rain.material as ShaderMaterial
@@ -98,5 +100,5 @@ func _on_video_finished() -> void:
 
 
 func _go_race() -> void:
-	RaceWorld.start_difficulty = _diff
+	RaceWorld.start_mode = _mode
 	get_tree().change_scene_to_packed(RaceScene)

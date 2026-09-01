@@ -1,8 +1,8 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene format=3 uid="uid://bt3dcwtt1ytub"]
 
-[ext_resource type="Script" path="res://scripts/boot.gd" id="1_boot"]
-[ext_resource type="Shader" path="res://shaders/lens_rain.gdshader" id="2_rain"]
-[ext_resource type="Shader" path="res://shaders/title_shift.gdshader" id="3_title"]
+[ext_resource type="Script" uid="uid://bi1445qdu0yx5" path="res://scripts/boot.gd" id="1_boot"]
+[ext_resource type="Shader" uid="uid://belgvhlouklac" path="res://shaders/lens_rain.gdshader" id="2_rain"]
+[ext_resource type="Shader" uid="uid://db6vldsch8knp" path="res://shaders/title_shift.gdshader" id="3_title"]
 
 [sub_resource type="ShaderMaterial" id="LensRainMat"]
 shader = ExtResource("2_rain")
@@ -19,7 +19,7 @@ shader_parameter/sat = 0.82
 shader_parameter/val = 1.0
 shader_parameter/sweep = 0.16
 
-[node name="Boot" type="Control"]
+[node name="Boot" type="Control" unique_id=533154134]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -28,7 +28,7 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_boot")
 
-[node name="Background" type="TextureRect" parent="."]
+[node name="Background" type="TextureRect" parent="." unique_id=881088709]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -36,19 +36,18 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 expand_mode = 1
-stretch_mode = 0
 
-[node name="IntroVideo" type="VideoStreamPlayer" parent="."]
+[node name="IntroVideo" type="VideoStreamPlayer" parent="." unique_id=508424086]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-expand = true
 volume_db = -80.0
+expand = true
 
-[node name="LensRain" type="ColorRect" parent="."]
+[node name="LensRain" type="ColorRect" parent="." unique_id=1019761764]
 material = SubResource("LensRainMat")
 layout_mode = 1
 anchors_preset = 15
@@ -57,9 +56,8 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
-color = Color(1, 1, 1, 1)
 
-[node name="TitleBorder" type="Label" parent="."]
+[node name="TitleBorder" type="Label" parent="." unique_id=319697516]
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
@@ -73,7 +71,7 @@ theme_override_font_sizes/font_size = 96
 text = "PSY RACER"
 horizontal_alignment = 1
 
-[node name="Title" type="Label" parent="."]
+[node name="Title" type="Label" parent="." unique_id=4993611]
 material = SubResource("TitleShiftMat")
 layout_mode = 1
 anchors_preset = 10
@@ -87,7 +85,7 @@ theme_override_font_sizes/font_size = 96
 text = "PSY RACER"
 horizontal_alignment = 1
 
-[node name="Byline" type="Label" parent="."]
+[node name="Byline" type="Label" parent="." unique_id=3662127]
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
@@ -101,7 +99,7 @@ theme_override_font_sizes/font_size = 22
 text = "by DiamondHand.Dev"
 horizontal_alignment = 1
 
-[node name="Dim" type="ColorRect" parent="."]
+[node name="Dim" type="ColorRect" parent="." unique_id=1371051627]
 layout_mode = 1
 anchors_preset = 12
 anchor_top = 1.0
@@ -112,43 +110,43 @@ grow_horizontal = 2
 grow_vertical = 0
 color = Color(0.01, 0.02, 0.05, 0.72)
 
-[node name="Panel" type="HBoxContainer" parent="."]
+[node name="Panel" type="HBoxContainer" parent="." unique_id=618821450]
 layout_mode = 1
 anchors_preset = 7
 anchor_left = 0.5
 anchor_top = 1.0
 anchor_right = 0.5
 anchor_bottom = 1.0
-offset_left = -420.0
+offset_left = -500.0
 offset_top = -150.0
-offset_right = 420.0
+offset_right = 500.0
 offset_bottom = -70.0
 grow_horizontal = 2
 grow_vertical = 0
-theme_override_constants/separation = 18
+theme_override_constants/separation = 16
 alignment = 1
 
-[node name="Easy" type="Button" parent="Panel"]
-custom_minimum_size = Vector2(160, 56)
+[node name="Standard" type="Button" parent="Panel" unique_id=1328717506]
+custom_minimum_size = Vector2(190, 56)
 layout_mode = 2
-text = "EASY"
+text = "STANDARD"
 
-[node name="Medium" type="Button" parent="Panel"]
-custom_minimum_size = Vector2(160, 56)
+[node name="Chase" type="Button" parent="Panel" unique_id=420780881]
+custom_minimum_size = Vector2(150, 56)
 layout_mode = 2
-text = "MEDIUM"
+text = "CHASE"
 
-[node name="Hard" type="Button" parent="Panel"]
-custom_minimum_size = Vector2(160, 56)
+[node name="Enforcement" type="Button" parent="Panel" unique_id=1178963035]
+custom_minimum_size = Vector2(230, 56)
 layout_mode = 2
-text = "HARD"
+text = "ENFORCEMENT"
 
-[node name="Start" type="Button" parent="Panel"]
-custom_minimum_size = Vector2(200, 56)
+[node name="Start" type="Button" parent="Panel" unique_id=1760050906]
+custom_minimum_size = Vector2(180, 56)
 layout_mode = 2
-text = "START RACE"
+text = "START"
 
-[node name="Hint" type="Label" parent="."]
+[node name="Hint" type="Label" parent="." unique_id=1152490099]
 layout_mode = 1
 anchors_preset = 7
 anchor_left = 0.5
@@ -159,12 +157,14 @@ offset_left = -280.0
 offset_top = -58.0
 offset_right = 280.0
 offset_bottom = -24.0
+grow_horizontal = 2
+grow_vertical = 0
 theme_override_colors/font_color = Color(0.55, 0.9, 1, 0.85)
 theme_override_font_sizes/font_size = 18
 text = "ENTER to race    WASD to drive    M music"
 horizontal_alignment = 1
 
-[node name="Flash" type="ColorRect" parent="."]
+[node name="Flash" type="ColorRect" parent="." unique_id=1319405767]
 visible = false
 layout_mode = 1
 anchors_preset = 15

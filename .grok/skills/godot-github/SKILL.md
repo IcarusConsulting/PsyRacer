@@ -100,3 +100,19 @@ Robocopy exit 0–7 is success. Also copy this skill to
 ## After a successful push
 
 Reply with repo URL, commit URL, and confirm the Developer share path. Do not claim a push or mirror succeeded without command output.
+
+## PsyRacer implementation notes
+
+- Main flow: `scenes/boot.tscn` → `scripts/boot.gd` → `scenes/race.tscn` → `scripts/race_world.gd`; `RaceSim` in `scripts/race_sim.gd` owns mode, physics, AI, collisions, distance, and reverse movement.
+- Splash UX: the initial menu exposes `MODE` and `OPTIONS`. `MODE` opens a translucent selector, then a mode detail page with an image placeholder, description, and `START RACE`. Do not let the mode selector itself start the race.
+- Race modes: `RaceSim.Mode.STANDARD`, `.CHASE`, and `.ENFORCEMENT`; all share the same procedural world and use `RaceWorld.start_mode` when changing scenes.
+- Procedural road: `RaceWorld` rebuilds visible road geometry around the player. Keep road surface and markings separate when assigning materials; a single combined material makes white separators/amber center/yellow shoulder lines indistinguishable.
+- Tunnel and bridge spans are positioned from `finish_distance` at one-third and two-thirds progress. `RaceSim.terrain_height()` and `RaceSim.road_center()` must use matching spans and easing, otherwise entry/exit transitions snap.
+- Camera: update camera position from the player world position plus a fixed local offset every frame. Preserve the player Y component; never clamp the camera to a global fixed height. The skyline orientation is intentionally static to prevent side-to-side waving.
+- Reverse: `S` first brakes to zero, then sets `RaceSim.reversing`; reverse distance decreases and reverse top speed is half of forward top speed. The camera swaps to a front-facing reverse view while reversing.
+- Asset cleanup: obsolete car/tree sprite sheets were removed from `assets/sprites`; current vehicle visuals use `assets/cars/*.glb` through `HyperCar`.
+- Sky shader path is case-sensitive and must remain `res://assets/sky/SkyStar.gdshader` (lowercase directory).
+- Highway signs use `SystemFont` fallback directly; do not load the absent `assets/fonts/YuGothR.ttc`.
+- Validation command:
+  `& "C:\Program Files\Godot 4\Godot_v4.7.2-stable_win64_console.exe" --headless --path "C:\Users\gotch\PsyRacer-Godot" --editor --quit`
+  For runtime coverage, use `--scene "res://scenes/race.tscn" --quit-after 5`.

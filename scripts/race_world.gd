@@ -289,7 +289,7 @@ func _sync_transforms(delta: float) -> void:
 	_player.global_position = ppos
 	var heading := -RaceSim.road_curve(sim.distance + 6.0) * 0.45
 	var dt := maxf(delta, 0.0001)
-	var player_slide := clampf((sim.player_x - _prev_player_x) / dt * 1.6, -1.0, 1.0)
+	var player_slide := clampf((sim.player_x - _prev_player_x) / dt * 0.9, -1.0, 1.0)
 	_prev_player_x = sim.player_x
 	_player.pose(heading + (PI if sim.reversing else 0.0), player_slide, delta)
 
@@ -710,9 +710,10 @@ func _update_scenery() -> void:
 			var spec: Array = want[key]
 			var sz := float(spec[0])
 			n.global_position = sim.world_pos(sz, float(spec[1]))
-			n.position.y = 0.0
 			if key.begins_with("s"):
 				n.rotation.y = -RaceSim.road_curve(sz + 6.0) * 0.45
+			else:
+				n.position.y = _road_height(sz)
 			continue
 		var spec2: Array = want[key]
 		var zz := int(spec2[0])

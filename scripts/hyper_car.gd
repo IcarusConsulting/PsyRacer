@@ -5,8 +5,8 @@ extends Node3D
 ## Models in assets/cars/ are auto-fitted to TARGET_LENGTH, grounded, +Z forward.
 
 const TARGET_LENGTH := 4.2
-const SLIDE_YAW := 0.55
-const SLIDE_ROLL := 0.14
+const SLIDE_YAW := 0.36
+const SLIDE_ROLL := 0.08
 const LIGHTBAR_SCALE := 0.7
 const BAR_ON := 18.0 * LIGHTBAR_SCALE
 const BAR_OFF := 0.2 * LIGHTBAR_SCALE
@@ -65,12 +65,10 @@ func _build() -> void:
 		var packed := load(model_path) as PackedScene
 		if packed != null:
 			_build_model(packed)
-			if is_player:
-				_add_headlights()
+			_add_vehicle_lights()
 			return
 	_build_primitive()
-	if is_player:
-		_add_headlights()
+	_add_vehicle_lights()
 
 
 func _build_model(packed: PackedScene) -> void:
@@ -275,6 +273,12 @@ func _build_primitive() -> void:
 		_cyl(0.22, 0.3, Vector3(xz.x, 0.38, xz.y), rim)
 
 
+func _add_vehicle_lights() -> void:
+	_add_headlights()
+	_add_tail_lights()
+	_add_road_reflections()
+
+
 func _add_headlights() -> void:
 	var nose_z := 2.2
 	var hx := 0.5
@@ -298,6 +302,81 @@ func _add_headlights() -> void:
 	var light_r := light_l.duplicate() as SpotLight3D
 	light_r.position.x = hx
 	add_child(light_r)
+
+
+func _add_tail_lights() -> void:
+	var tail_z := -2.1
+	var tx := 0.5
+	var ty := 0.52
+	if _model != null:
+		var aabb := _aabb_local(_model)
+		if aabb.size != Vector3.ZERO:
+			tail_z = aabb.position.z + 0.05
+			tx = aabb.size.x * 0.22
+			ty = clampf(aabb.size.y * 0.38, 0.35, 0.7)
+	var tail_color := Color(1.0, 0.04, 0.015)
+	for x in [-tx, tx]:
+		var lamp := MeshInstance3D.new()
+		var lamp_mesh := SphereMesh.new()
+		lamp_mesh.radius = 0.13
+		lamp_mesh.height = 0.08
+		lamp.mesh = lamp_mesh
+		lamp.position = Vector3(x, ty, tail_z)
+		lamp.material_override = _mat(tail_color, tail_color, 2.5)
+		add_child(lamp)
+
+		var tail := OmniLight3D.new()
+		tail.position = Vector3(x, ty, tail_z)
+		tail.light_color = tail_color
+		tail.light_energy = 0.9
+		tail.light_specular = 0.35
+		tail.light_size = 0.25
+		tail.omni_range = 7.0
+		tail.omni_attenuation = 1.7
+		tail.shadow_enabled = false
+		tail.light_volumetric_fog_energy = 0.06
+		add_child(tail)
+
+
+func _add_road_reflections() -> void:
+	var front_color := Color(cyan.r, cyan.g, cyan.b, 0.035)
+	var rear_color := Color(1.0, 0.035, 0.02, 0.022)
+	_add_reflection_patch("HeadlightRoadReflection", Vector3(0.0, 0.025, 3.2), Vector2(2.8, 6.0), front_color, false)
+	_add_reflection_patch("TaillightRoadReflection", Vector3(0.0, 0.026, -3.6), Vector2(2.4, 3.0), rear_color, true)
+
+
+func _add_reflection_patch(label: String, pos: Vector3, size: Vector2, color: Color, source_at_end: bool) -> void:
+	var patch := MeshInstance3D.new()
+	patch.name = label
+	var mesh := QuadMesh.new()
+	mesh.size = size
+	patch.mesh = mesh
+	patch.position = pos
+	patch.rotation_degrees.x = 90.0
+	var shader := Shader.new()
+	shader.code = """
+shader_type spatial;
+render_mode unshaded, cull_disabled, depth_draw_never;
+
+uniform vec4 tint : source_color;
+uniform bool source_at_end = false;
+
+void fragment() {
+	float edge_fade = smoothstep(0.0, 0.2, UV.x) * smoothstep(0.0, 0.2, 1.0 - UV.x);
+	float distance_from_source = source_at_end ? 1.0 - UV.y : UV.y;
+	float distance_fade = 1.0 - smoothstep(0.0, 1.0, distance_from_source);
+	ALBEDO = tint.rgb;
+	EMISSION = tint.rgb * 0.65;
+	ALPHA = tint.a * edge_fade * distance_fade;
+}
+"""
+	var mat := ShaderMaterial.new()
+	mat.shader = shader
+	mat.set_shader_parameter("tint", color)
+	mat.set_shader_parameter("source_at_end", source_at_end)
+	patch.material_override = mat
+	patch.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(patch)
 
 
 func _mat_name(src: Material) -> String:

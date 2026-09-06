@@ -203,7 +203,7 @@ func tick(delta: float, steer: float, throttle: float, brake: float) -> void:
 		speed = clampf(speed, 0.0, reverse_max_speed if reversing else max_speed)
 
 		var curve := road_curve(distance + 8.0)
-		player_x += steer * (0.045 + speed * 0.03) * step
+		player_x += steer * (0.032 + speed * 0.022) * step
 		player_x += curve * speed * 0.018 * step
 		player_x = clampf(player_x, -1.65, 1.65)
 
@@ -236,7 +236,6 @@ func _update_ai(step: float) -> void:
 			car.speed -= 0.004 * step
 		car.speed = clampf(car.speed, 0.0, car.target_speed)
 		car.x += (car.lane - car.x) * 0.08 * step
-		car.x += sin(car.z * 0.04 + car.number) * 0.004 * step
 		car.x = clampf(car.x, -0.82, 0.82)
 		car.z += car.speed * DIST_PER_SPEED * step
 

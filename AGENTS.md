@@ -29,9 +29,13 @@ paths = ["\\\\192.168.1.72\\fast\\Developer\\.grok\\skills"]
 - Music: `assets/Background Music.mp3` loops from launch, `M` mutes, videos have no audio.
 - Lamps sit just outside the roadway, blue-white both sides.
 - Overhead NEXCO-style gantries every 2000 m (Yu Gothic / system CJK).
-- Title modes (all 20 km Medium): **Standard** (5 AI, collision → 50% max speed), **Chase** (cop merges at 3000 m, same top speed as player, ram chase, bust if player < 50 km/h), **Enforcement** (player is `police.glb`, 6 AI, rams remove AI with no player slowdown, win when none remain).
+- Title modes (all 20 km Medium): **Standard** (5 AI, collision → 50% max speed), **Chase** (cop merges at 3000 m, same top speed as player, ram chase, bust if player < 50 km/h, persistent randomized police roadblocks every 2500 m after the merge; hitting a roadblock busts the player and removes AI racers), **Enforcement** (player is `police.glb`, 6 AI, rams remove AI with no player slowdown, win when none remain).
 - Cars: Standard/Chase player is `assets/cars/player.glb`. Enforcement player and Chase cop are `police.glb`. AI use `ghost.glb`. Yaw/lean from lateral speed; chase cam stays on road heading. Primitive boxes remain a fallback if a GLB fails to load.
+- Mode and Options overlays are mutually exclusive toggles with animated open/close transitions; overlays keep an even gap above the bottom menu bar.
+- Mode detail images are user-supplied files in `samples/Standard Menu Mode Image.jpg`, `samples/Chase Menu Mode Image.jpg`, and `samples/Enforcement Menu Mode Image.jpg`.
+- Audio settings expose realtime music preview with 10% slider steps; Apply Settings commits the selected values.
+- Controls include a Keyboard Bindings submenu for Accelerate, Brake / Reverse, Left, and Right. Rebindings stage until Apply Settings and race movement reads the named InputMap actions.
 
 ## Controls
 
-WASD / arrows drive. Enter starts. Esc returns to title. M mutes.
+WASD / arrows drive by default. Enter starts. Esc returns to title. M mutes. Keyboard bindings can be changed from Options → Controls → Keyboard Bindings.

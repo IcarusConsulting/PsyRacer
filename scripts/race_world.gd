@@ -5,7 +5,7 @@ static var start_mode: RaceSim.Mode = RaceSim.Mode.STANDARD
 
 const LANE_HALF := 7.0
 const ROAD_HALF := 12.0
-const LOOK_AHEAD := 220.0
+const LOOK_AHEAD := 520.0
 const LOOK_BEHIND := 18.0
 const Z_STEP := 2.0
 const SIGN_SPACING := 2000
@@ -42,11 +42,29 @@ var _skyline_heading := PI
 
 
 func _ready() -> void:
+	_ensure_input_actions()
 	sim = RaceSim.new()
 	sim.setup(start_mode)
 	_build_world()
 	_build_hud()
 	_update_horizon()
+
+
+func _ensure_input_actions() -> void:
+	var defaults := {
+		"accelerate": [KEY_W, KEY_UP],
+		"brake_reverse": [KEY_S, KEY_DOWN],
+		"steer_left": [KEY_A, KEY_LEFT],
+		"steer_right": [KEY_D, KEY_RIGHT],
+	}
+	for action_name in defaults:
+		if not InputMap.has_action(action_name):
+			InputMap.add_action(action_name)
+		if InputMap.action_get_events(action_name).is_empty():
+			for keycode in defaults[action_name]:
+				var key_event := InputEventKey.new()
+				key_event.physical_keycode = keycode
+				InputMap.action_add_event(action_name, key_event)
 
 
 func _build_world() -> void:
@@ -170,7 +188,7 @@ func _build_world() -> void:
 	_camera = Camera3D.new()
 	_camera.fov = 66.0
 	_camera.near = 0.15
-	_camera.far = 520.0
+	_camera.far = 700.0
 	add_child(_camera)
 	_camera.current = true
 	_camera_offset = Vector3(0.0, 2.35, -9.2)
@@ -236,16 +254,17 @@ func _process(delta: float) -> void:
 	var steer := 0.0
 	var throttle := 0.0
 	var brake := 0.0
-	if Input.is_physical_key_pressed(KEY_A) or Input.is_physical_key_pressed(KEY_LEFT):
+	if Input.is_action_pressed("steer_left"):
 		steer += 1.0
-	if Input.is_physical_key_pressed(KEY_D) or Input.is_physical_key_pressed(KEY_RIGHT):
+	if Input.is_action_pressed("steer_right"):
 		steer -= 1.0
-	if Input.is_physical_key_pressed(KEY_W) or Input.is_physical_key_pressed(KEY_UP):
+	if Input.is_action_pressed("accelerate"):
 		throttle = 1.0
-	if Input.is_physical_key_pressed(KEY_S) or Input.is_physical_key_pressed(KEY_DOWN):
+	if Input.is_action_pressed("brake_reverse"):
 		brake = 1.0
 
 	sim.tick(delta, steer, throttle, brake)
+	_sync_ai_nodes()
 	_sync_transforms(delta)
 	_rebuild_road(false)
 	_update_scenery()
@@ -256,6 +275,20 @@ func _process(delta: float) -> void:
 		_finish_hold += delta
 		if _finish_hold > 2.2:
 			_go_title()
+
+
+func _sync_ai_nodes() -> void:
+	while _ai_nodes.size() < sim.cars.size():
+		var index := _ai_nodes.size()
+		var racer: RaceSim.Racer = sim.cars[index]
+		var car := HyperCar.new()
+		car.number = racer.number
+		car.model_path = "res://assets/cars/police.glb" if racer.is_police else "res://assets/cars/ghost.glb"
+		add_child(car)
+		if racer.is_police:
+			car.enable_lightbar()
+		_ai_nodes.append(car)
+		_prev_ai_x.append(racer.x)
 
 
 func _wash_from_lightbars() -> void:

@@ -9,6 +9,7 @@ const DIST_PER_SPEED := 6.5
 const KMH_SCALE := 180.0
 const BUST_KMH := 50.0
 const POLICE_MERGE_Z := 3000.0
+const ROADBLOCK_SPACING := 2500.0
 const POLICE_SHOULDER_X := 1.22
 const POLICE_SPEED_SCALE := 1.0
 const SPEED_SCALE := 0.5
@@ -23,9 +24,11 @@ class Racer:
 	var hue: float
 	var speed: float = 0.0
 	var target_speed: float
+	var lane_change_timer: float = 0.0
 	var number: int
 	var car_name: String
 	var is_police: bool = false
+	var is_roadblock: bool = false
 	var removed: bool = false
 
 
@@ -102,6 +105,7 @@ func setup(p_mode: Mode) -> void:
 		r.z = spec["z"]
 		r.x = spec["x"]
 		r.lane = spec["x"]
+		r.lane_change_timer = randf_range(0.8, 2.8)
 		r.hue = spec["hue"]
 		r.target_speed = max_speed * ai_speed_scale * spec["pace"]
 		r.number = spec["number"]
@@ -119,6 +123,20 @@ func setup(p_mode: Mode) -> void:
 		cop.is_police = true
 		cop.speed = 0.0
 		cars.append(cop)
+		var roadblock_distance := POLICE_MERGE_Z + ROADBLOCK_SPACING
+		while roadblock_distance < finish_distance:
+			var roadblock := Racer.new()
+			roadblock.z = roadblock_distance
+			roadblock.x = randf_range(-0.82, 0.82)
+			roadblock.lane = roadblock.x
+			roadblock.hue = 220.0
+			roadblock.number = 1000 + cars.size()
+			roadblock.car_name = "Roadblock"
+			roadblock.is_police = true
+			roadblock.is_roadblock = true
+			roadblock.target_speed = 0.0
+			cars.append(roadblock)
+			roadblock_distance += ROADBLOCK_SPACING
 
 
 static func road_curve(z: float) -> float:
@@ -235,12 +253,18 @@ func _update_ai(step: float) -> void:
 		else:
 			car.speed -= 0.004 * step
 		car.speed = clampf(car.speed, 0.0, car.target_speed)
+		car.lane_change_timer -= step / FRAME_HZ
+		if car.lane_change_timer <= 0.0:
+			car.lane = randf_range(-0.82, 0.82)
+			car.lane_change_timer = randf_range(1.5, 4.0)
 		car.x += (car.lane - car.x) * 0.08 * step
 		car.x = clampf(car.x, -0.82, 0.82)
 		car.z += car.speed * DIST_PER_SPEED * step
 
 
 func _update_police(car: Racer, step: float) -> void:
+	if car.is_roadblock:
+		return
 	if not police_spawned:
 		if distance >= POLICE_MERGE_Z:
 			police_spawned = true
@@ -263,6 +287,9 @@ func _collide() -> void:
 	var current: Dictionary = {}
 	for car in cars:
 		if car.removed:
+			continue
+		if mode == Mode.CHASE and car.is_roadblock:
+			_check_roadblock_hit(car, current)
 			continue
 		var rel: float = car.z - distance
 		var near := false
@@ -294,6 +321,25 @@ func _collide() -> void:
 			crashed = true
 			crash_timer = 8.0 / FRAME_HZ
 	overlapping = current
+
+
+func _check_roadblock_hit(roadblock: Racer, current: Dictionary) -> void:
+	var player_hit := absf(roadblock.z - distance) < 6.0 and absf(roadblock.x - player_x) < 0.30
+	if player_hit:
+		current[roadblock.number] = true
+		if not overlapping.has(roadblock.number):
+			busted = true
+			finished = true
+		return
+	for car in cars:
+		if car.removed or car.is_police:
+			continue
+		if absf(car.z - roadblock.z) >= 6.0 or absf(car.x - roadblock.x) >= 0.30:
+			continue
+		current[roadblock.number] = true
+		car.removed = true
+		car.speed = 0.0
+		break
 
 
 func _check_bust() -> void:

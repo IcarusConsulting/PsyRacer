@@ -53,6 +53,12 @@ func toggle() -> void:
 		_player.play()
 
 
+func preview_music_volume(new_music_volume: float) -> void:
+	if _player == null:
+		return
+	_player.volume_db = _music_volume_db(new_music_volume)
+
+
 func apply_settings(new_sound_on: bool, new_music_on: bool, new_music_volume: float, new_fx_on: bool, new_fx_volume: float) -> void:
 	sound_on = new_sound_on
 	music_on = new_music_on
@@ -62,4 +68,8 @@ func apply_settings(new_sound_on: bool, new_music_on: bool, new_music_volume: fl
 	if _player == null:
 		return
 	_player.stream_paused = not (sound_on and music_on)
-	_player.volume_db = linear_to_db(maxf(music_volume, 0.001)) - 4.0
+	_player.volume_db = _music_volume_db(music_volume)
+
+
+func _music_volume_db(value: float) -> float:
+	return linear_to_db(maxf(clampf(value, 0.0, 1.0), 0.001)) - 4.0
